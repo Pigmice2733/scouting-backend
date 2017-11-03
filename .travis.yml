@@ -1,0 +1,17 @@
+language: go
+
+go:
+ - 1.9
+ - tip
+
+matrix:
+  allow_failures:
+   - go: tip
+
+  fast_finish: true
+
+before-script:
+ - go get -t
+
+script:
+ - go test -v ./...

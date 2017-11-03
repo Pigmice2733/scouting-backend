@@ -5,7 +5,9 @@ Clone from Github
 
 Install [Go](https://golang.org/doc/install)
 
-Create `config.json` in the project directory (*go/src/scouting-backend*), containing
+Install package dependencies by running `go get -t -v` in the project directory *`go/src/scouting-backend`*
+
+Create `config.json` in the project directory, containing
 ```json
 {
     "tbaApikey": "<your key>"
