@@ -1,0 +1,11 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Config file
+config.json
+
+# Database
+*.db
