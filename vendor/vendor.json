@@ -1,0 +1,31 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "5nNxYvGxOL3b2p2yTVuGedTu36A=",
+			"path": "github.com/NYTimes/gziphandler",
+			"revision": "97ae7fbaf81620fe97840685304a78a306a39c64",
+			"revisionTime": "2017-09-16T00:36:49Z"
+		},
+		{
+			"checksumSHA1": "V3fAepHCumzqiy8JK4fI4iVp9jo=",
+			"path": "github.com/gorilla/mux",
+			"revision": "7625a85c14e615274a4ee4bc8654f72310a563e4",
+			"revisionTime": "2017-10-20T03:47:00Z"
+		},
+		{
+			"checksumSHA1": "1GP1Eea1wRP/WhUl9t1YBATPc2c=",
+			"path": "github.com/mattn/go-sqlite3",
+			"revision": "615c193e01d8d462eef7ee390171506f531a1c9a",
+			"revisionTime": "2017-10-24T02:57:10Z"
+		},
+		{
+			"checksumSHA1": "GtamqiJoL7PGHsN454AoffBFMa8=",
+			"path": "golang.org/x/net/context",
+			"revision": "c73622c77280266305273cb545f54516ced95b93",
+			"revisionTime": "2017-06-11T01:16:46Z"
+		}
+	],
+	"rootPath": "scouting-backend"
+}

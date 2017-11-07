@@ -150,6 +150,9 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Vary", "Accept-Encoding")
+
+	w.Header().Set("Cache-Control", "public, max-age=60")
+
 	w.WriteHeader(code)
 	w.Write(response)
 }
