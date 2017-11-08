@@ -170,7 +170,7 @@ func respondSetJSON(w http.ResponseWriter, code int, payload interface{}) {
 func respondGetJSON(w http.ResponseWriter, code int, payload interface{}, cacheMinutes int, ifNoneMatch []string) {
 	response, _ := json.Marshal(payload)
 	contentETag, _ := generateEtag(response)
-	cacheControl := fmt.Sprintf("public, max-age=%x", (cacheMinutes * 60))
+	cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
 
 	w.Header().Set("Cache-Control", cacheControl)
 	w.Header().Set("ETag", contentETag)
