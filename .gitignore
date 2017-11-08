@@ -4,9 +4,6 @@
 *.so
 *.dylib
 
-# Config file
-config.json
-
 # Database
 *.db
 

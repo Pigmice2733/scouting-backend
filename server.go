@@ -4,6 +4,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/sha3"
 )
 
 // A Server is an instance of the scouting server
@@ -129,37 +131,77 @@ func (s *Server) clearEventTable() {
 	s.DB.Exec("UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM events) WHERE name=\"events\"")
 }
 
-func respondWithError(w http.ResponseWriter, code int, message string) {
-	respondWithJSON(w, code, map[string]string{"error": message})
+func generateEtag(content []byte) (string, error) {
+	hash := make([]byte, 32)
+	d := sha3.NewShake256()
+	// Write the response into the hash
+	d.Write(content)
+	// Read 32 bytes of output from the hash into h.
+	_, err := d.Read(hash)
+
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash), nil
 }
 
-func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
-	response, _ := json.Marshal(payload)
-
+func respond(w http.ResponseWriter, code int, payload []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Vary", "Accept-Encoding")
 
-	w.Header().Set("Cache-Control", "public, max-age=60")
-
 	w.WriteHeader(code)
-	w.Write(response)
+	w.Write(payload)
+}
+
+func respondError(w http.ResponseWriter, code int, message string) {
+	payload, _ := json.Marshal(map[string]string{"error": message})
+	w.Header().Set("Cache-Control", "no-cache")
+	respond(w, code, payload)
+}
+
+// Use for setter methods - POST, DELETE, etc.
+func respondSetJSON(w http.ResponseWriter, code int, payload interface{}) {
+	response, _ := json.Marshal(payload)
+	w.Header().Set("Cache-Control", "no-cache")
+	respond(w, code, response)
+}
+
+// Use for getter methods - GET, HEAD
+func respondGetJSON(w http.ResponseWriter, code int, payload interface{}, cacheMinutes int, ifNoneMatch []string) {
+	response, _ := json.Marshal(payload)
+	contentETag, _ := generateEtag(response)
+	cacheControl := fmt.Sprintf("public, max-age=%x", (cacheMinutes * 60))
+
+	w.Header().Set("Cache-Control", cacheControl)
+	w.Header().Set("ETag", contentETag)
+
+	for _, eTag := range ifNoneMatch {
+		if eTag == contentETag {
+			respond(w, http.StatusNotModified, nil)
+			return
+		}
+	}
+
+	respond(w, code, response)
 }
 
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := getEvents(s.DB)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, events)
+	ifNoneMatch := r.Header["If-None-Match"]
+	// Cache for 24 hours = 1440 minutes
+	respondGetJSON(w, http.StatusOK, events, 1440, ifNoneMatch)
 }
 
 func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid event ID")
+		respondError(w, http.StatusBadRequest, "Invalid event ID")
 		return
 	}
 	e := event{
@@ -168,17 +210,17 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	err = e.getEvent(s.DB)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusNotFound, "Non-existent event ID")
+			respondError(w, http.StatusNotFound, "Non-existent event ID")
 			return
 		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	matches, err := getMatches(s.DB, e)
 
 	if err != nil && err != sql.ErrNoRows {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -187,19 +229,21 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		Matches: matches,
 	}
 
-	respondWithJSON(w, http.StatusOK, fullEvent)
+	ifNoneMatch := r.Header["If-None-Match"]
+	// Cache for 1 minute
+	respondGetJSON(w, http.StatusOK, fullEvent, 1, ifNoneMatch)
 }
 
 func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	eventID, err := strconv.Atoi(vars["eventID"])
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid event ID")
+		respondError(w, http.StatusBadRequest, "Invalid event ID")
 		return
 	}
 	matchID, err := strconv.Atoi(vars["matchID"])
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid match ID")
+		respondError(w, http.StatusBadRequest, "Invalid match ID")
 		return
 	}
 	e := event{
@@ -208,10 +252,10 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	err = e.getEvent(s.DB)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusNotFound, "Non-existent event ID")
+			respondError(w, http.StatusNotFound, "Non-existent event ID")
 			return
 		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	partialMatch := match{
@@ -222,10 +266,10 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusNotFound, "Non-existent match ID under event ID")
+			respondError(w, http.StatusNotFound, "Non-existent match ID under event ID")
 			return
 		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -246,7 +290,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 				IsBlue:  true,
 			}
 		} else {
-			respondWithError(w, http.StatusInternalServerError, err.Error())
+			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
@@ -259,7 +303,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 				IsBlue:  false,
 			}
 		} else {
-			respondWithError(w, http.StatusInternalServerError, err.Error())
+			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
@@ -270,7 +314,9 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 		BlueAlliance: blueAlliance,
 	}
 
-	respondWithJSON(w, http.StatusOK, fullMatch)
+	ifNoneMatch := r.Header["If-None-Match"]
+	// Cache for 1 minutes
+	respondGetJSON(w, http.StatusOK, fullMatch, 1, ifNoneMatch)
 }
 
 func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +324,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	matchID, err := strconv.Atoi(vars["matchID"])
 
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid match ID")
+		respondError(w, http.StatusBadRequest, "Invalid match ID")
 		return
 	}
 
@@ -286,7 +332,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&report); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		respondError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 	defer r.Body.Close()
@@ -295,7 +341,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err != sql.ErrNoRows {
-			respondWithError(w, http.StatusInternalServerError, err.Error())
+			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.Team1 = report.Team
@@ -314,23 +360,23 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 			}
 			a.Team3 = report.Team
 		default:
-			respondWithError(w, http.StatusBadRequest, "More than three reports for a single alliance not permitted")
+			respondError(w, http.StatusBadRequest, "More than three reports for a single alliance not permitted")
 			return
 		}
 
 		if teamReportAlreadyExists {
-			respondWithError(w, http.StatusConflict, "Report post for team already exists, use 'PUT' to update")
+			respondError(w, http.StatusConflict, "Report post for team already exists, use 'PUT' to update")
 		}
 
 		a.updateAlliance(s.DB)
 	}
 
 	if err := report.createReport(s.DB, allianceID); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, report)
+	respondSetJSON(w, http.StatusCreated, report)
 }
 
 func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
@@ -338,13 +384,13 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 
 	matchID, err := strconv.Atoi(vars["matchID"])
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid match ID")
+		respondError(w, http.StatusBadRequest, "Invalid match ID")
 		return
 	}
 
 	teamNumber, err := strconv.Atoi(vars["team"])
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid team number")
+		respondError(w, http.StatusBadRequest, "Invalid team number")
 		return
 	}
 
@@ -352,7 +398,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&report); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		respondError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 	defer r.Body.Close()
@@ -361,9 +407,9 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
+			respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
 		} else {
-			respondWithError(w, http.StatusInternalServerError, err.Error())
+			respondError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -371,20 +417,20 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	teamReportExists := (a.Team1 == report.Team || a.Team2 == report.Team || a.Team3 == report.Team)
 
 	if !teamReportExists {
-		respondWithError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
+		respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
 	}
 
 	if report.Team != teamNumber {
-		respondWithError(w, http.StatusBadRequest, "Report team does not match team specified in URI")
+		respondError(w, http.StatusBadRequest, "Report team does not match team specified in URI")
 		return
 	}
 
 	if err := report.updateReport(s.DB, allianceID); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, report)
+	respondSetJSON(w, http.StatusOK, report)
 }
 
 func (s *Server) findAlliance(matchID int, report reportData) (int, alliance, error) {

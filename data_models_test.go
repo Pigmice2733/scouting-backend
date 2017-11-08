@@ -70,7 +70,7 @@ func addEvents(count int) {
 
 	for i := 0; i < count; i++ {
 		_, err := s.DB.Exec("INSERT INTO events (key, name, date) VALUES (?, ?, ?)", (strconv.Itoa(i + 1)), ("Event " + strconv.Itoa(i+1)), time.Now().UTC().Format(time.RFC3339))
-	    if err != nil {
+		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
