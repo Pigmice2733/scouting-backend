@@ -9,6 +9,18 @@
 			"revisionTime": "2017-09-16T00:36:49Z"
 		},
 		{
+			"checksumSHA1": "usTqB3t+oa0uKS87jJRfpUOFMfM=",
+			"path": "github.com/Pigmice2733/scouting-backend/logger",
+			"revision": "ebd827367edae5fa8b392b46afc8f15dd09ec172",
+			"revisionTime": "2017-11-09T00:23:50Z"
+		},
+		{
+			"checksumSHA1": "IkPM2QLv9urri7S49wzroQx9oXA=",
+			"path": "github.com/gorilla/context",
+			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
+			"revisionTime": "2016-08-17T18:46:32Z"
+		},
+		{
 			"checksumSHA1": "V3fAepHCumzqiy8JK4fI4iVp9jo=",
 			"path": "github.com/gorilla/mux",
 			"revision": "7625a85c14e615274a4ee4bc8654f72310a563e4",
