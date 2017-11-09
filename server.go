@@ -286,7 +286,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ifNoneMatch := r.Header["If-None-Match"]
-	// Cache for 1 minutes
+	// Cache for 1 minute
 	respondGetJSON(w, http.StatusOK, fullMatch, 1, ifNoneMatch)
 }
 
@@ -434,7 +434,6 @@ CREATE TABLE IF NOT EXISTS matches
 (
 	key              TEXT PRIMARY KEY,
 	eventKey         TEXT NOT NULL,
-	number           INT NOT NULL,
 	winningAlliance  TEXT,
 	FOREIGN KEY(eventKey) REFERENCES events(key)
 )`

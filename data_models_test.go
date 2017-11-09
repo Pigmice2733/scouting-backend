@@ -66,7 +66,7 @@ func addEvent() (string, error) {
 }
 
 func addMatch(eKey string) (string, error) {
-	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey, number) VALUES (?, ?, ?)", "Mtch1", eKey, -1)
+	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey) VALUES (?, ?)", "Mtch1", eKey)
 	if err != nil {
 		return "", err
 	}
@@ -74,7 +74,7 @@ func addMatch(eKey string) (string, error) {
 }
 
 func addFullMatch(eKey string, winningAlliance string) (string, error) {
-	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey, number, winningAlliance) VALUES (?, ?, ?, ?)", "FullMatch", eKey, -1, winningAlliance)
+	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES (?, ?, ?)", "FullMatch", eKey, winningAlliance)
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +109,7 @@ func addReports(allianceID int, team int) error {
 func TestEmptyEventTable(t *testing.T) {
 	setupTables()
 
-	req, _ := http.NewRequest("GET", "/events/", nil)
+	req, _ := http.NewRequest("GET", "/events", nil)
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -127,7 +127,7 @@ func TestGetEventMultiple(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	req, _ := http.NewRequest("GET", "/events/", nil)
+	req, _ := http.NewRequest("GET", "/events", nil)
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -153,7 +153,7 @@ func TestGetMatchMultiple(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	endpoint := fmt.Sprintf("/events/%s/", eKey)
+	endpoint := fmt.Sprintf("/events/%s", eKey)
 
 	req, _ := http.NewRequest("GET", endpoint, nil)
 	response := executeRequest(req)
@@ -188,7 +188,7 @@ func TestGetMatchData(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	endpoint := fmt.Sprintf("/events/%s/%s/", eKey, mKey)
+	endpoint := fmt.Sprintf("/events/%s/%s", eKey, mKey)
 
 	req, _ := http.NewRequest("GET", endpoint, nil)
 	response := executeRequest(req)
@@ -222,7 +222,7 @@ func TestAddValidReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	endpoint := fmt.Sprintf("/events/%s/%s/", eKey, mKey)
+	endpoint := fmt.Sprintf("/events/%s/%s", eKey, mKey)
 
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
@@ -264,7 +264,7 @@ func TestAddInvalidReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": 9, "gears": 3, "fuel": 10 }}`)
 
-	endpoint := fmt.Sprintf("/events/%v/%v/", eKey, mKey)
+	endpoint := fmt.Sprintf("/events/%v/%v", eKey, mKey)
 
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
@@ -283,7 +283,7 @@ func TestPostReportFakeMatch(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	endpoint := fmt.Sprintf("/event/%v/1/", eKey)
+	endpoint := fmt.Sprintf("/event/%v/1", eKey)
 
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
@@ -305,7 +305,7 @@ func TestPostExistingReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	endpoint := fmt.Sprintf("/events/%v/%v/", eKey, mKey)
+	endpoint := fmt.Sprintf("/events/%v/%v", eKey, mKey)
 
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
@@ -339,7 +339,7 @@ func TestUpdateReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	endpoint := fmt.Sprintf("/events/%v/%v/2733/", eKey, mKey)
+	endpoint := fmt.Sprintf("/events/%v/%v/2733", eKey, mKey)
 
 	req, _ := http.NewRequest("PUT", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
@@ -374,7 +374,7 @@ func TestUpdateNonexistentReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("PUT", "/events/Evnt1/1/2733/", bytes.NewBuffer(payload))
+	req, _ := http.NewRequest("PUT", "/events/Evnt1/1/2733", bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusNotFound, response.Code)

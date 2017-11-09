@@ -88,7 +88,6 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 func pollTBAMatches(db *sql.DB, tbaAPI string, apikey string, eventKey string) ([]match, error) {
 	type tbaMatch struct {
 		Key    string `json:"key"`
-		Number int    `json:"match_number"`
 	}
 	var tbaMatches []tbaMatch
 
@@ -138,7 +137,6 @@ func pollTBAMatches(db *sql.DB, tbaAPI string, apikey string, eventKey string) (
 		newMatch := match{
 			Key:      tbaMatch.Key,
 			EventKey: eventKey,
-			Number:   tbaMatch.Number,
 		}
 		matches = append(matches, newMatch)
 	}

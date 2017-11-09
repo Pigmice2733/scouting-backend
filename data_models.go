@@ -23,14 +23,12 @@ type fullEvent struct {
 type match struct {
 	Key             string `json:"key"`
 	EventKey        string `json:"eventKey"`
-	Number          int    `json:"number"`
 	WinningAlliance string `json:"winningAlliance"`
 }
 
 type fullMatch struct {
 	Key             string   `json:"key"`
 	EventKey        string   `json:"eventKey"`
-	Number          int      `json:"number"`
 	WinningAlliance string   `json:"winningAlliance"`
 	RedAlliance     alliance `json:"redAlliance"`
 	BlueAlliance    alliance `json:"blueAlliance"`
@@ -117,10 +115,10 @@ func (e *event) createEvent(db *sql.DB) error {
 }
 
 func (m *match) getMatch(db *sql.DB) error {
-	row := db.QueryRow("SELECT number, winningAlliance FROM matches WHERE eventKey=? AND key=?", m.EventKey, m.Key)
+	row := db.QueryRow("SELECT winningAlliance FROM matches WHERE eventKey=? AND key=?", m.EventKey, m.Key)
 
 	var winningAlliance sql.NullString
-	err := row.Scan(&m.Number, &winningAlliance)
+	err := row.Scan(&winningAlliance)
 	if err != nil {
 		return err
 	}
@@ -134,7 +132,7 @@ func (m *match) getMatch(db *sql.DB) error {
 }
 
 func getMatches(db *sql.DB, e event) ([]match, error) {
-	rows, err := db.Query("SELECT key, eventKey, number, winningAlliance FROM matches WHERE eventKey=?", e.Key)
+	rows, err := db.Query("SELECT key, eventKey, winningAlliance FROM matches WHERE eventKey=?", e.Key)
 
 	if err != nil {
 		return nil, err
@@ -147,7 +145,7 @@ func getMatches(db *sql.DB, e event) ([]match, error) {
 	for rows.Next() {
 		var m match
 		var winningAlliance sql.NullString
-		if err := rows.Scan(&m.Key, &m.EventKey, &m.Number, &winningAlliance); err != nil {
+		if err := rows.Scan(&m.Key, &m.EventKey, &winningAlliance); err != nil {
 			return nil, err
 		}
 		if !winningAlliance.Valid {
@@ -162,7 +160,7 @@ func getMatches(db *sql.DB, e event) ([]match, error) {
 }
 
 func (m *match) createMatch(db *sql.DB) error {
-	_, err := db.Exec("INSERT OR IGNORE INTO matches(key, eventKey, number, winningAlliance) VALUES(?, ?, ?, ?)", m.Key, m.EventKey, m.Number, m.WinningAlliance)
+	_, err := db.Exec("INSERT OR IGNORE INTO matches(key, eventKey, winningAlliance) VALUES(?, ?, ?)", m.Key, m.EventKey, m.WinningAlliance)
 	return err
 }
 
