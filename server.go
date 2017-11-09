@@ -66,11 +66,11 @@ func (s *Server) PollTBA(year string) {
 func (s *Server) initializeRouter() {
 	s.Router = mux.NewRouter().StrictSlash(true)
 
-	s.Router.Handle("/events/", wrapHandler(s.getEvents, "getEvents", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/", wrapHandler(s.getEvent, "getEvent", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}/", wrapHandler(s.getMatch, "getMatch", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}/", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
-	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}/", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
+	s.Router.Handle("/events", wrapHandler(s.getEvents, "getEvents", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}", wrapHandler(s.getEvent, "getEvent", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.getMatch, "getMatch", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
+	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
 
 	s.logger.Infof("Initialized router...")
 }
