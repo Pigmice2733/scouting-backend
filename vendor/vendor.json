@@ -31,6 +31,18 @@
 			"path": "golang.org/x/net/context",
 			"revision": "c73622c77280266305273cb545f54516ced95b93",
 			"revisionTime": "2017-06-11T01:16:46Z"
+		},
+		{
+			"checksumSHA1": "jJ9vH9w4vw4LnE9V65b6NhRnRl4=",
+			"path": "scouting-backend",
+			"revision": "bbca2622563b8fdc67461a8f2ea685307dd8d850",
+			"revisionTime": "2017-11-08T22:54:41Z"
+		},
+		{
+			"checksumSHA1": "vAozG9xPx/Bg1e1W4D6b9h0INrI=",
+			"path": "scouting-backend/logger",
+			"revision": "bbca2622563b8fdc67461a8f2ea685307dd8d850",
+			"revisionTime": "2017-11-08T22:54:41Z"
 		}
 	],
 	"rootPath": "scouting-backend"
