@@ -18,7 +18,12 @@ func main() {
 
 	fmt.Println("Using port " + port)
 
-	server := New("scouting.db", os.Stdout)
+	environment, valid := os.LookupEnv("ENVIRONMENT")
+	if !valid {
+		environment = "dev"
+	}
+
+	server := New("scouting.db", os.Stdout, environment)
 	server.PollTBA("2017", tbaAPIKey)
 
 	server.Run(":" + port)

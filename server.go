@@ -29,17 +29,24 @@ type Server struct {
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(dbFileName string, logWriter io.Writer) *Server {
+func New(dbFileName string, logWriter io.Writer, environment string) *Server {
 	s := &Server{}
+
+	s.logger = logger.New(logWriter, logger.Settings{
+		Debug: environment == "dev",
+		Info:  true,
+		Error: true,
+	})
+
 	s.initializeDB(dbFileName)
 	s.initializeRouter()
-	s.logger = logger.New(logWriter)
+
 	return s
 }
 
 // Run starts a running the server on the specified address
 func (s *Server) Run(addr string) {
-	fmt.Println("Server up and running!")
+	s.logger.Infof("Server up and running!")
 	log.Fatal(http.ListenAndServe(addr, s.Router))
 }
 
@@ -57,7 +64,7 @@ func (s *Server) PollTBA(year string, apikey string) {
 
 	req, err := http.NewRequest("GET", tbaAddress+"/events/"+year, nil)
 	if err != nil {
-		fmt.Printf("TBA polling failed with error %s\n", err)
+		s.logger.Errorf("TBA polling failed with error %s\n", err)
 		return
 	}
 
@@ -67,7 +74,7 @@ func (s *Server) PollTBA(year string, apikey string) {
 	response, err := client.Do(req)
 
 	if err != nil {
-		fmt.Printf("TBA polling request failed with error %s\n", err)
+		s.logger.Errorf("TBA polling request failed with error %s\n", err)
 		return
 	}
 	eventData, _ := ioutil.ReadAll(response.Body)
@@ -80,7 +87,7 @@ func (s *Server) PollTBA(year string, apikey string) {
 	for _, tbaEvent := range tbaEvents {
 		date, err := time.Parse("2006-01-02", tbaEvent.Date)
 		if err != nil {
-			fmt.Println("Error in processing TBA time data " + err.Error())
+			s.logger.Errorf("Error in processing TBA time data " + err.Error())
 			continue
 		}
 		newEvent := event{
@@ -93,7 +100,7 @@ func (s *Server) PollTBA(year string, apikey string) {
 
 	s.createEvents(events)
 
-	fmt.Println("Polled TBA...")
+	s.logger.Infof("Polled TBA...")
 }
 
 func (s *Server) initializeRouter() {
@@ -105,7 +112,7 @@ func (s *Server) initializeRouter() {
 	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
 	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
 
-	fmt.Println("Initialized router...")
+	s.logger.Infof("Initialized router...")
 }
 
 func (s *Server) initializeDB(dbFileName string) {
@@ -125,7 +132,7 @@ func (s *Server) initializeDB(dbFileName string) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Initialized database...")
+	s.logger.Infof("Initialized database...")
 }
 
 func wrapHandler(inner http.HandlerFunc, name string, logger logger.Service) http.Handler {
@@ -460,7 +467,7 @@ func (s *Server) createEvents(events []event) error {
 	for _, event := range events {
 		err := event.createEvent(s.DB)
 		if err != nil {
-			fmt.Printf(fmt.Sprintf("Error processing TBA data '%s' in data '%v'", err.Error(), event))
+			s.logger.Errorf("Error processing TBA data '%s' in data '%v'", err.Error(), event)
 			return err
 		}
 	}

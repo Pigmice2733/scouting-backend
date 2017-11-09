@@ -18,7 +18,7 @@ import (
 var s *Server
 
 func TestMain(m *testing.M) {
-  s = New("testing.db", os.Stdout)
+	s = New("testing.db", os.Stdout, "dev")
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }

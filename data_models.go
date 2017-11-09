@@ -4,7 +4,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 )
 
@@ -122,7 +121,6 @@ func getMatches(db *sql.DB, e event) ([]match, error) {
 	rows, err := db.Query("SELECT id, eventID, winningAlliance FROM matches WHERE eventID=?", e.ID)
 
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -133,7 +131,6 @@ func getMatches(db *sql.DB, e event) ([]match, error) {
 	for rows.Next() {
 		var m match
 		if err := rows.Scan(&m.ID, &m.EventID, &m.WinningAlliance); err != nil {
-			fmt.Println("Match scanning failed " + err.Error())
 			return nil, err
 		}
 		matches = append(matches, m)
