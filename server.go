@@ -154,6 +154,7 @@ func generateEtag(content []byte) (string, error) {
 func respond(w http.ResponseWriter, code int, payload []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Vary", "Accept-Encoding")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9000")
 
 	w.WriteHeader(code)
 	w.Write(payload)
