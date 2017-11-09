@@ -28,11 +28,13 @@ type Server struct {
 	logger logger.Service
 }
 
-// Initialize setups up the database and router for the server
-func (s *Server) Initialize(dbFileName string, logWriter io.Writer) {
+// New creates a new server given a db file and a io.Writer for logging
+func New(dbFileName string, logWriter io.Writer) *Server {
+	s := &Server{}
 	s.initializeDB(dbFileName)
 	s.initializeRouter()
 	s.logger = logger.New(logWriter)
+	return s
 }
 
 // Run starts a running the server on the specified address
