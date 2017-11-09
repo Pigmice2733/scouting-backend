@@ -19,7 +19,7 @@ func main() {
 	fmt.Println("Using port " + port)
 
 	server := Server{}
-	server.Initialize("scouting.db")
+	server.Initialize("scouting.db", os.Stdout)
 	server.PollTBA("2017", tbaAPIKey)
 
 	server.Run(":" + port)

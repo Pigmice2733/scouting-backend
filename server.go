@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
+	"github.com/Pigmice2733/scouting-backend/logger"
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/sha3"
@@ -23,12 +25,14 @@ import (
 type Server struct {
 	Router *mux.Router
 	DB     *sql.DB
+	logger logger.Service
 }
 
 // Initialize setups up the database and router for the server
-func (s *Server) Initialize(dbFileName string) {
+func (s *Server) Initialize(dbFileName string, logWriter io.Writer) {
 	s.initializeDB(dbFileName)
 	s.initializeRouter()
+	s.logger = logger.New(logWriter)
 }
 
 // Run starts a running the server on the specified address
@@ -93,11 +97,11 @@ func (s *Server) PollTBA(year string, apikey string) {
 func (s *Server) initializeRouter() {
 	s.Router = mux.NewRouter().StrictSlash(true)
 
-	s.Router.Handle("/events", wrapHandler(s.getEvents, "getEvents")).Methods("GET")
-	s.Router.Handle("/events/{id:[0-9]+}", wrapHandler(s.getEvent, "getEvent")).Methods("GET")
-	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.getMatch, "getMatch")).Methods("GET")
-	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.postReport, "postReport")).Methods("POST")
-	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport")).Methods("PUT")
+	s.Router.Handle("/events", wrapHandler(s.getEvents, "getEvents", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{id:[0-9]+}", wrapHandler(s.getEvent, "getEvent", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.getMatch, "getMatch", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
+	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
 
 	fmt.Println("Initialized router...")
 }
@@ -122,8 +126,8 @@ func (s *Server) initializeDB(dbFileName string) {
 	fmt.Println("Initialized database...")
 }
 
-func wrapHandler(inner http.HandlerFunc, name string) http.Handler {
-	return gziphandler.GzipHandler(Logger(inner, name))
+func wrapHandler(inner http.HandlerFunc, name string, logger logger.Service) http.Handler {
+	return gziphandler.GzipHandler(logger.Middleware(inner, name))
 }
 
 func (s *Server) clearEventTable() {

@@ -19,7 +19,7 @@ var s Server
 
 func TestMain(m *testing.M) {
 	s = Server{}
-	s.Initialize("testing.db")
+	s.Initialize("testing.db", os.Stdout)
 
 	exitCode := m.Run()
 

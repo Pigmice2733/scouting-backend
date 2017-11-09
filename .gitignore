@@ -3,6 +3,7 @@
 *.dll
 *.so
 *.dylib
+scouting-backend
 
 # Database
 *.db
