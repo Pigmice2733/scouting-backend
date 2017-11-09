@@ -8,36 +8,41 @@ import (
 )
 
 type event struct {
-	ID   int       `json:"id"`
 	Key  string    `json:"key"`
 	Name string    `json:"name"`
 	Date time.Time `json:"date"`
 }
 
 type fullEvent struct {
-	Event   event   `json:"event"`
-	Matches []match `json:"matches"`
+	Key     string    `json:"key"`
+	Name    string    `json:"name"`
+	Date    time.Time `json:"date"`
+	Matches []match   `json:"matches"`
 }
 
 type match struct {
-	ID              int            `json:"id"`
-	EventID         int            `json:"eventID"`
-	WinningAlliance sql.NullString `json:"winningAlliance"`
+	Key             string `json:"key"`
+	EventKey        string `json:"eventKey"`
+	Number          int    `json:"number"`
+	WinningAlliance string `json:"winningAlliance"`
 }
 
 type fullMatch struct {
-	Match        match    `json:"match"`
-	RedAlliance  alliance `json:"redAlliance"`
-	BlueAlliance alliance `json:"blueAlliance"`
+	Key             string   `json:"key"`
+	EventKey        string   `json:"eventKey"`
+	Number          int      `json:"number"`
+	WinningAlliance string   `json:"winningAlliance"`
+	RedAlliance     alliance `json:"redAlliance"`
+	BlueAlliance    alliance `json:"blueAlliance"`
 }
 
 type alliance struct {
-	MatchID int  `json:"matchID"`
-	IsBlue  bool `json:"isBlue"`
-	Score   int  `json:"score"`
-	Team1   int  `json:"team1"`
-	Team2   int  `json:"team2"`
-	Team3   int  `json:"team3"`
+	MatchKey string `json:"matchKey"`
+	IsBlue   bool   `json:"isBlue"`
+	Score    int    `json:"score"`
+	Team1    int    `json:"team1"`
+	Team2    int    `json:"team2"`
+	Team3    int    `json:"team3"`
 }
 
 type autoReport struct {
@@ -61,7 +66,7 @@ type reportData struct {
 }
 
 func getEvents(db *sql.DB) ([]event, error) {
-	rows, err := db.Query("SELECT id, key, name, date FROM events")
+	rows, err := db.Query("SELECT key, name, date FROM events")
 
 	if err != nil {
 		return nil, err
@@ -74,7 +79,7 @@ func getEvents(db *sql.DB) ([]event, error) {
 	for rows.Next() {
 		var e event
 		var dateString string
-		if err := rows.Scan(&e.ID, &e.Key, &e.Name, &dateString); err != nil {
+		if err := rows.Scan(&e.Key, &e.Name, &dateString); err != nil {
 			return nil, err
 		}
 		date, err := time.Parse(time.RFC3339, dateString)
@@ -89,11 +94,11 @@ func getEvents(db *sql.DB) ([]event, error) {
 }
 
 func (e *event) getEvent(db *sql.DB) error {
-	row := db.QueryRow("SELECT key, name, date FROM events WHERE id=?", e.ID)
+	row := db.QueryRow("SELECT name, date FROM events WHERE key=?", e.Key)
 
 	var dateString string
 
-	if err := row.Scan(&e.Key, &e.Name, &dateString); err != nil {
+	if err := row.Scan(&e.Name, &dateString); err != nil {
 		return err
 	}
 
@@ -107,18 +112,29 @@ func (e *event) getEvent(db *sql.DB) error {
 }
 
 func (e *event) createEvent(db *sql.DB) error {
-	_, err := db.Exec("INSERT INTO events(key, name, date) VALUES(?, ?, ?)", e.Key, e.Name, e.Date.Format(time.RFC3339))
+	_, err := db.Exec("INSERT OR IGNORE INTO events(key, name, date) VALUES(?, ?, ?)", e.Key, e.Name, e.Date.Format(time.RFC3339))
 	return err
 }
 
 func (m *match) getMatch(db *sql.DB) error {
-	row := db.QueryRow("SELECT winningAlliance FROM matches WHERE eventID=? AND id=?", m.EventID, m.ID)
+	row := db.QueryRow("SELECT number, winningAlliance FROM matches WHERE eventKey=? AND key=?", m.EventKey, m.Key)
 
-	return row.Scan(&m.WinningAlliance)
+	var winningAlliance sql.NullString
+	err := row.Scan(&m.Number, &winningAlliance)
+	if err != nil {
+		return err
+	}
+
+	if !winningAlliance.Valid {
+		m.WinningAlliance = ""
+	} else {
+		m.WinningAlliance = winningAlliance.String
+	}
+	return nil
 }
 
 func getMatches(db *sql.DB, e event) ([]match, error) {
-	rows, err := db.Query("SELECT id, eventID, winningAlliance FROM matches WHERE eventID=?", e.ID)
+	rows, err := db.Query("SELECT key, eventKey, number, winningAlliance FROM matches WHERE eventKey=?", e.Key)
 
 	if err != nil {
 		return nil, err
@@ -130,8 +146,14 @@ func getMatches(db *sql.DB, e event) ([]match, error) {
 
 	for rows.Next() {
 		var m match
-		if err := rows.Scan(&m.ID, &m.EventID, &m.WinningAlliance); err != nil {
+		var winningAlliance sql.NullString
+		if err := rows.Scan(&m.Key, &m.EventKey, &m.Number, &winningAlliance); err != nil {
 			return nil, err
+		}
+		if !winningAlliance.Valid {
+			m.WinningAlliance = ""
+		} else {
+			m.WinningAlliance = winningAlliance.String
 		}
 		matches = append(matches, m)
 	}
@@ -140,12 +162,12 @@ func getMatches(db *sql.DB, e event) ([]match, error) {
 }
 
 func (m *match) createMatch(db *sql.DB) error {
-	_, err := db.Exec("INSERT INTO matches(eventID, winingAlliance) VALUES(?, ?)", m.EventID, m.WinningAlliance)
+	_, err := db.Exec("INSERT OR IGNORE INTO matches(key, eventKey, number, winningAlliance) VALUES(?, ?, ?, ?)", m.Key, m.EventKey, m.Number, m.WinningAlliance)
 	return err
 }
 
 func (a *alliance) getAlliance(db *sql.DB) (int, error) {
-	row := db.QueryRow("SELECT id, score, team1, team2, team2 FROM alliances WHERE matchID=? AND isBlue=?", a.MatchID, a.IsBlue)
+	row := db.QueryRow("SELECT id, score, team1, team2, team2 FROM alliances WHERE matchKey=? AND isBlue=?", a.MatchKey, a.IsBlue)
 
 	var allianceID int
 	err := row.Scan(&allianceID, &a.Score, &a.Team1, &a.Team2, &a.Team3)
@@ -153,14 +175,21 @@ func (a *alliance) getAlliance(db *sql.DB) (int, error) {
 }
 
 func (a *alliance) updateAlliance(db *sql.DB) error {
-	_, err := db.Exec("UPDATE alliances SET team1=?, team2=?, team3=? WHERE matchID=? AND isBlue=?", a.Team1, a.Team2, a.Team3, a.MatchID, a.IsBlue)
+	_, err := db.Exec("UPDATE alliances SET team1=?, team2=?, team3=? WHERE matchKey=? AND isBlue=?", a.Team1, a.Team2, a.Team3, a.MatchKey, a.IsBlue)
 	return err
 }
 
-func (a *alliance) createAlliance(db *sql.DB) error {
-	_, err := db.Exec("INSERT INTO alliances(matchID, score, team1, team2, team3, isBlue) VALUES (?, ?, ?, ?, ?, ?)",
-		a.MatchID, a.Score, a.Team1, a.Team2, a.Team3, a.IsBlue)
-	return err
+func (a *alliance) createAlliance(db *sql.DB) (int, error) {
+	res, err := db.Exec("INSERT INTO alliances(matchKey, score, team1, team2, team3, isBlue) VALUES (?, ?, ?, ?, ?, ?)",
+		a.MatchKey, a.Score, a.Team1, a.Team2, a.Team3, a.IsBlue)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return int(id), nil
 }
 
 func (r *reportData) createReport(db *sql.DB, allianceID int) error {

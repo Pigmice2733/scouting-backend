@@ -8,14 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/logger"
+	"github.com/NYTimes/gziphandler"
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/sha3"
@@ -23,13 +21,14 @@ import (
 
 // A Server is an instance of the scouting server
 type Server struct {
-	Router *mux.Router
-	DB     *sql.DB
-	logger logger.Service
+	Router    *mux.Router
+	DB        *sql.DB
+	logger    logger.Service
+	TBAAPIKey string
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(dbFileName string, logWriter io.Writer, environment string) *Server {
+func New(dbFileName string, logWriter io.Writer, tbaAPIKey string, environment string) *Server {
 	s := &Server{}
 
 	s.logger = logger.New(logWriter, logger.Settings{
@@ -41,6 +40,14 @@ func New(dbFileName string, logWriter io.Writer, environment string) *Server {
 	s.initializeDB(dbFileName)
 	s.initializeRouter()
 
+	s.logger = logger.New(logWriter, logger.Settings{
+		Debug: environment == "dev",
+		Info:  true,
+		Error: true,
+	})
+
+	s.TBAAPIKey = tbaAPIKey
+
 	return s
 }
 
@@ -50,67 +57,20 @@ func (s *Server) Run(addr string) {
 	log.Fatal(http.ListenAndServe(addr, s.Router))
 }
 
-// PollTBA polls The Blue Alliance api for scouting data
-func (s *Server) PollTBA(year string, apikey string) {
-
+// PollTBA polls The Blue Alliance api to populate database
+func (s *Server) PollTBA(year string) {
 	tbaAddress := "https://www.thebluealliance.com/api/v3"
-
-	type tbaEvent struct {
-		Key  string `json:"key"`
-		Name string `json:"name"`
-		Date string `json:"start_date"`
-	}
-	var tbaEvents []tbaEvent
-
-	req, err := http.NewRequest("GET", tbaAddress+"/events/"+year, nil)
-	if err != nil {
-		s.logger.Errorf("TBA polling failed with error %s\n", err)
-		return
-	}
-
-	req.Header.Set("X-TBA-Auth-Key", apikey)
-
-	client := &http.Client{}
-	response, err := client.Do(req)
-
-	if err != nil {
-		s.logger.Errorf("TBA polling request failed with error %s\n", err)
-		return
-	}
-	eventData, _ := ioutil.ReadAll(response.Body)
-	json.Unmarshal(eventData, &tbaEvents)
-
-	s.clearEventTable()
-
-	var events []event
-
-	for _, tbaEvent := range tbaEvents {
-		date, err := time.Parse("2006-01-02", tbaEvent.Date)
-		if err != nil {
-			s.logger.Errorf("Error in processing TBA time data " + err.Error())
-			continue
-		}
-		newEvent := event{
-			Key:  tbaEvent.Key,
-			Name: tbaEvent.Name,
-			Date: date,
-		}
-		events = append(events, newEvent)
-	}
-
-	s.createEvents(events)
-
-	s.logger.Infof("Polled TBA...")
+	pollTBAEvents(s.DB, s.logger, tbaAddress, s.TBAAPIKey, year)
 }
 
 func (s *Server) initializeRouter() {
 	s.Router = mux.NewRouter().StrictSlash(true)
 
-	s.Router.Handle("/events", wrapHandler(s.getEvents, "getEvents", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{id:[0-9]+}", wrapHandler(s.getEvent, "getEvent", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.getMatch, "getMatch", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
-	s.Router.Handle("/events/{eventID:[0-9]+}/{matchID:[0-9]+}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
+	s.Router.Handle("/events/", wrapHandler(s.getEvents, "getEvents", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/", wrapHandler(s.getEvent, "getEvent", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/{matchKey}/", wrapHandler(s.getMatch, "getMatch", s.logger)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/{matchKey}/", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
+	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}/", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
 
 	s.logger.Infof("Initialized router...")
 }
@@ -122,6 +82,10 @@ func (s *Server) initializeDB(dbFileName string) {
 		log.Fatal(err)
 	}
 
+	if _, err := s.DB.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		log.Fatal(err)
+	}
+
 	if _, err := s.DB.Exec(eventTableCreationQuery); err != nil {
 		log.Fatal(err)
 	}
@@ -129,6 +93,9 @@ func (s *Server) initializeDB(dbFileName string) {
 		log.Fatal(err)
 	}
 	if _, err := s.DB.Exec(allianceTableCreationQuery); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := s.DB.Exec(tbaModifiedTableCreationQuery); err != nil {
 		log.Fatal(err)
 	}
 
@@ -202,6 +169,7 @@ func respondGetJSON(w http.ResponseWriter, code int, payload interface{}, cacheM
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := getEvents(s.DB)
 	if err != nil {
+		s.logger.Debugf("Error in getEvents %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -213,33 +181,37 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid event ID")
-		return
-	}
+	eventKey := vars["eventKey"]
 	e := event{
-		ID: id,
+		Key: eventKey,
 	}
-	err = e.getEvent(s.DB)
+	err := e.getEvent(s.DB)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondError(w, http.StatusNotFound, "Non-existent event ID")
+			respondError(w, http.StatusNotFound, "Non-existent event key")
 			return
 		}
+		s.logger.Debugf("Error in getEvent %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	matches, err := getMatches(s.DB, e)
+	matches, err := pollTBAMatches(s.DB, "https://www.thebluealliance.com/api/v3", s.TBAAPIKey, e.Key)
+	if err != nil {
+		s.logger.Infof(err.Error())
+	}
 
+	matches, err = getMatches(s.DB, e)
 	if err != nil && err != sql.ErrNoRows {
+		s.logger.Debugf("Error in getEvents %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	fullEvent := &fullEvent{
-		Event:   e,
+		Key:     e.Key,
+		Name:    e.Name,
+		Date:    e.Date,
 		Matches: matches,
 	}
 
@@ -250,82 +222,67 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	eventID, err := strconv.Atoi(vars["eventID"])
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid event ID")
-		return
-	}
-	matchID, err := strconv.Atoi(vars["matchID"])
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid match ID")
-		return
-	}
+	eventKey := vars["eventKey"]
+	matchKey := vars["matchKey"]
 	e := event{
-		ID: eventID,
+		Key: eventKey,
 	}
-	err = e.getEvent(s.DB)
+
+	err := e.getEvent(s.DB)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondError(w, http.StatusNotFound, "Non-existent event ID")
+			respondError(w, http.StatusNotFound, "Non-existent event key")
 			return
 		}
+		s.logger.Debugf("Error in getMatch %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	partialMatch := match{
-		ID:      matchID,
-		EventID: eventID,
+		Key:      matchKey,
+		EventKey: eventKey,
 	}
 	err = partialMatch.getMatch(s.DB)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondError(w, http.StatusNotFound, "Non-existent match ID under event ID")
+			respondError(w, http.StatusNotFound, "Non-existent match key under event key")
 			return
 		}
+		s.logger.Debugf("Error in getMatch %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	blueAlliance := alliance{
-		MatchID: matchID,
-		IsBlue:  true,
+		MatchKey: matchKey,
+		IsBlue:   true,
 	}
 	redAlliance := alliance{
-		MatchID: matchID,
-		IsBlue:  false,
+		MatchKey: matchKey,
+		IsBlue:   false,
 	}
 
 	_, err = blueAlliance.getAlliance(s.DB)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			blueAlliance = alliance{
-				MatchID: matchID,
-				IsBlue:  true,
-			}
-		} else {
-			respondError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+	if err != nil && err != sql.ErrNoRows {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	_, err = redAlliance.getAlliance(s.DB)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			redAlliance = alliance{
-				MatchID: matchID,
-				IsBlue:  false,
-			}
-		} else {
-			respondError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+	if err != nil && err != sql.ErrNoRows {
+		s.logger.Debugf("Error in getMatch %s", err.Error())
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	fullMatch := &fullMatch{
-		Match:        partialMatch,
-		RedAlliance:  redAlliance,
-		BlueAlliance: blueAlliance,
+		Key:             partialMatch.Key,
+		EventKey:        partialMatch.EventKey,
+		WinningAlliance: partialMatch.WinningAlliance,
+		RedAlliance:     redAlliance,
+		BlueAlliance:    blueAlliance,
 	}
 
 	ifNoneMatch := r.Header["If-None-Match"]
@@ -335,12 +292,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	matchID, err := strconv.Atoi(vars["matchID"])
-
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid match ID")
-		return
-	}
+	matchKey := vars["matchKey"]
 
 	var report reportData
 	decoder := json.NewDecoder(r.Body)
@@ -351,15 +303,20 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	allianceID, a, err := s.findAlliance(matchID, report)
+	allianceID, a, err := s.findAlliance(matchKey, report)
 
 	if err != nil {
 		if err != sql.ErrNoRows {
+			s.logger.Debugf("Error in postReport %s", err.Error())
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.Team1 = report.Team
-		a.createAlliance(s.DB)
+		allianceID, err = a.createAlliance(s.DB)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	} else {
 		teamReportAlreadyExists := false
 		switch {
@@ -382,10 +339,16 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusConflict, "Report post for team already exists, use 'PUT' to update")
 		}
 
-		a.updateAlliance(s.DB)
+		err := a.updateAlliance(s.DB)
+		if err != nil {
+			s.logger.Debugf("Error in postReport %s", err.Error())
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	if err := report.createReport(s.DB, allianceID); err != nil {
+		s.logger.Debugf("Error in postReport %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -395,13 +358,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-
-	matchID, err := strconv.Atoi(vars["matchID"])
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid match ID")
-		return
-	}
-
+	matchKey := vars["matchKey"]
 	teamNumber, err := strconv.Atoi(vars["team"])
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid team number")
@@ -417,12 +374,12 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	allianceID, a, err := s.findAlliance(matchID, report)
-
+	allianceID, a, err := s.findAlliance(matchKey, report)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
 		} else {
+			s.logger.Debugf("Error in updateReport %s", err.Error())
 			respondError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
@@ -440,6 +397,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := report.updateReport(s.DB, allianceID); err != nil {
+		s.logger.Debugf("Error in updateReport %s", err.Error())
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -447,62 +405,51 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	respondSetJSON(w, http.StatusOK, report)
 }
 
-func (s *Server) findAlliance(matchID int, report reportData) (int, alliance, error) {
+func (s *Server) findAlliance(matchKey string, report reportData) (int, alliance, error) {
 	isBlue := true
 	if report.Alliance == "red" {
 		isBlue = false
 	}
 
 	a := alliance{
-		MatchID: matchID,
-		IsBlue:  isBlue,
-		Score:   report.Score,
+		MatchKey: matchKey,
+		IsBlue:   isBlue,
+		Score:    report.Score,
 	}
 
 	id, err := a.getAlliance(s.DB)
 	return id, a, err
 }
 
-func (s *Server) createEvents(events []event) error {
-	for _, event := range events {
-		err := event.createEvent(s.DB)
-		if err != nil {
-			s.logger.Errorf("Error processing TBA data '%s' in data '%v'", err.Error(), event)
-			return err
-		}
-	}
-	return nil
-}
-
 const eventTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS events
 (
-	id   INTEGER PRIMARY KEY,
-	key  TEXT    NOT NULL,
-    name TEXT    NOT NULL,
-    date TEXT    NOT NULL
+	key  TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    date TEXT NOT NULL
 )`
 
 const matchTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS matches
 (
-	id              INTEGER PRIMARY KEY,
-	eventID         INT     NOT NULL,
-	winningAlliance TEXT,
-	FOREIGN KEY(eventID) REFERENCES events(id)
+	key              TEXT PRIMARY KEY,
+	eventKey         TEXT NOT NULL,
+	number           INT NOT NULL,
+	winningAlliance  TEXT,
+	FOREIGN KEY(eventKey) REFERENCES events(key)
 )`
 
 const allianceTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS alliances
 (
-	id      INTEGER PRIMARY KEY,
-	matchID INT     NOT NULL,
-	score   INT     NOT NULL,
-	team1   INT,
-	team2   INT,
-	team3   INT,
-	isBlue  INT     NOT NULL,
-	FOREIGN KEY(matchID) REFERENCES matches(id)
+	id       INTEGER PRIMARY KEY,
+	matchKey TEXT    NOT NULL,
+	score    INT     NOT NULL,
+	team1    INT,
+	team2    INT,
+	team3    INT,
+	isBlue   INT     NOT NULL,
+	FOREIGN KEY(matchKey) REFERENCES matches(key)
 )
 `
 
@@ -520,5 +467,14 @@ CREATE TABLE IF NOT EXISTS reports
 	gears         INT,
 	teleopFuel    INT,
 	FOREIGN KEY(allianceID) REFERENCES alliances(id)
+)
+`
+
+const tbaModifiedTableCreationQuery = `
+CREATE TABLE IF NOT EXISTS tbaModified
+(
+	name         TEXT PRIMARY KEY,
+	lastModified TEXT,
+	maxAge       TEXT
 )
 `

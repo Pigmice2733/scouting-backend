@@ -10,8 +10,8 @@ matrix:
 
   fast_finish: true
 
-before-script:
- - go get -t
+install:
+ - go get -t -v ./...
 
 script:
  - go test -v ./...

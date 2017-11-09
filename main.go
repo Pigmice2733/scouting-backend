@@ -23,8 +23,8 @@ func main() {
 		environment = "dev"
 	}
 
-	server := New("scouting.db", os.Stdout, environment)
-	server.PollTBA("2017", tbaAPIKey)
+	server := New("scouting.db", os.Stdout, tbaAPIKey, environment)
+	server.PollTBA("2017")
 
 	server.Run(":" + port)
 }

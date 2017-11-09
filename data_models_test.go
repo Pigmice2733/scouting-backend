@@ -6,11 +6,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -18,7 +16,7 @@ import (
 var s *Server
 
 func TestMain(m *testing.M) {
-	s = New("testing.db", os.Stdout, "dev")
+	s = New("file::memory:?mode=memory&cache=shared", os.Stdout, "", "dev")
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }
@@ -28,16 +26,15 @@ func setupTables() {
 	ensureTableExists(matchTableCreationQuery)
 	ensureTableExists(allianceTableCreationQuery)
 	ensureTableExists(reportTableCreationQuery)
-	clearTable("events")
-	clearTable("matches")
-	clearTable("alliances")
+	// Order matters!
 	clearTable("reports")
+	clearTable("alliances")
+	clearTable("matches")
+	clearTable("events")
 }
 
 func ensureTableExists(creationQuery string) {
-	if _, err := s.DB.Exec(creationQuery); err != nil {
-		log.Fatal(err)
-	}
+	s.DB.Exec(creationQuery)
 }
 
 func clearTable(t string) {
@@ -60,87 +57,77 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 	}
 }
 
-func addEvents(count int) {
-	if count < 1 {
-		count = 1
+func addEvent() (string, error) {
+	_, err := s.DB.Exec("INSERT INTO events (key, name, date) VALUES (?, ?, ?)", "Evnt1", "Event 1", time.Now().UTC().Format(time.RFC3339))
+	if err != nil {
+		return "", err
 	}
-
-	for i := 0; i < count; i++ {
-		_, err := s.DB.Exec("INSERT INTO events (key, name, date) VALUES (?, ?, ?)", (strconv.Itoa(i + 1)), ("Event " + strconv.Itoa(i+1)), time.Now().UTC().Format(time.RFC3339))
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	}
+	return "Evnt1", nil
 }
 
-func addMatches(count int, eID int) {
-	if count < 1 {
-		count = 1
+func addMatch(eKey string) (string, error) {
+	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey, number) VALUES (?, ?, ?)", "Mtch1", eKey, -1)
+	if err != nil {
+		return "", err
 	}
-
-	for i := 0; i < count; i++ {
-		_, err := s.DB.Exec("INSERT INTO matches (eventID) VALUES (?)", eID)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	}
+	return "Mtch1", nil
 }
 
-func addAlliances(count int, matchID int, isBlue bool) {
-	if count < 1 {
-		count = 1
+func addFullMatch(eKey string, winningAlliance string) (string, error) {
+	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey, number, winningAlliance) VALUES (?, ?, ?, ?)", "FullMatch", eKey, -1, winningAlliance)
+	if err != nil {
+		return "", err
 	}
-
-	for i := 0; i < count; i++ {
-		_, err := s.DB.Exec("INSERT INTO alliances(matchID, score, isBlue, team1, team2, team3) VALUES (?, ?, ?, ?, ?, ?)", matchID, ((i + 1) * 25), isBlue, 0, 0, 0)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	}
+	return "FullMatch", nil
 }
 
-func addReports(count int, allianceID int, team int) {
-	if count < 1 {
-		count = 1
+func addAlliance(matchKey string, isBlue bool) (int, error) {
+	res, err := s.DB.Exec("INSERT INTO alliances(matchKey, score, isBlue, team1, team2, team3) VALUES (?, ?, ?, ?, ?, ?)", matchKey, 451, isBlue, 0, 0, 0)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return int(id), nil
+}
+
+func addReports(allianceID int, team int) error {
+	_, err := s.DB.Exec("INSERT INTO reports(allianceID, teamNumber, score) VALUES (?, ?, ?)", allianceID, team, (allianceID * 25))
+	if err != nil {
+		return err
 	}
 
-	for i := 0; i < count; i++ {
-		_, err := s.DB.Exec("INSERT INTO reports(allianceID, teamNumber, score) VALUES (?, ?, ?)", allianceID, (allianceID * 25), team)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-
-		_, err = s.DB.Exec("UPDATE alliances SET team1=? WHERE id=?", team, allianceID)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
+	_, err = s.DB.Exec("UPDATE alliances SET team1=? WHERE id=?", team, allianceID)
+	if err != nil {
+		return err
 	}
+	return nil
 }
 
 func TestEmptyEventTable(t *testing.T) {
 	setupTables()
 
-	req, _ := http.NewRequest("GET", "/events", nil)
+	req, _ := http.NewRequest("GET", "/events/", nil)
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
 
 	if body := response.Body.String(); body != "[]" {
-		t.Errorf("Expected an empty array. Got %s", body)
+		t.Errorf("Expected an empty array. Got %v", body)
 	}
 }
 
 func TestGetEventMultiple(t *testing.T) {
 	setupTables()
 
-	addEvents(2)
+	_, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 
-	req, _ := http.NewRequest("GET", "/events", nil)
+	req, _ := http.NewRequest("GET", "/events/", nil)
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -157,10 +144,18 @@ func TestGetEventMultiple(t *testing.T) {
 func TestGetMatchMultiple(t *testing.T) {
 	setupTables()
 
-	addEvents(1)
-	addMatches(5, 1)
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	_, err = addMatch(eKey)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 
-	req, _ := http.NewRequest("GET", "/events/1", nil)
+	endpoint := fmt.Sprintf("/events/%s/", eKey)
+
+	req, _ := http.NewRequest("GET", endpoint, nil)
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -169,21 +164,67 @@ func TestGetMatchMultiple(t *testing.T) {
 
 	json.Unmarshal(response.Body.Bytes(), &fe)
 
-	if fe.Matches[2].EventID != 1 {
-		t.Errorf("Expected event ID to be '1'. Got '%v' instead.", fe.Matches[0].EventID)
+	if fe.Matches[0].EventKey != eKey {
+		t.Errorf("Expected event key to be '%v'. Got '%v' instead.", eKey, fe.Matches[0].EventKey)
+	}
+}
+
+func TestGetMatchData(t *testing.T) {
+	setupTables()
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	mKey, err := addFullMatch(eKey, "blue")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	id, err := addAlliance(mKey, true)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	err = addReports(id, 2733)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	endpoint := fmt.Sprintf("/events/%s/%s/", eKey, mKey)
+
+	req, _ := http.NewRequest("GET", endpoint, nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	fm := fullMatch{}
+
+	json.Unmarshal(response.Body.Bytes(), &fm)
+
+	if fm.EventKey != eKey {
+		t.Errorf("Expected event key to be '%v'. Got '%v' instead.", eKey, fm.EventKey)
+	}
+	if fm.WinningAlliance != "blue" {
+		t.Errorf("Expected match winning alliance to be 'blue'. Got '%v' instead.", fm.WinningAlliance)
 	}
 }
 
 func TestAddValidReport(t *testing.T) {
 	setupTables()
-	addEvents(1)
-	addMatches(1, 1)
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	mKey, err := addMatch(eKey)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 
 	payload := []byte(`{ "alliance": "red", "team": 2733, "score": 451,
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("POST", "/events/1/1", bytes.NewBuffer(payload))
+	endpoint := fmt.Sprintf("/events/%s/%s/", eKey, mKey)
+
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusCreated, response.Code)
@@ -210,49 +251,97 @@ func TestAddValidReport(t *testing.T) {
 
 func TestAddInvalidReport(t *testing.T) {
 	setupTables()
-	addEvents(1)
-	addMatches(1, 1)
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	mKey, err := addMatch(eKey)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 
 	payload := []byte(`{ "allince": 12, "tea": 2733,
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": 9, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("POST", "/events/1/1", bytes.NewBuffer(payload))
+	endpoint := fmt.Sprintf("/events/%v/%v/", eKey, mKey)
+
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusBadRequest, response.Code)
 }
 
-func TestAddExistingReport(t *testing.T) {
+func TestPostReportFakeMatch(t *testing.T) {
 	setupTables()
-	addEvents(1)
-	addMatches(1, 1)
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 
 	payload := []byte(`{ "alliance": "red", "team": 2733, "score": 451,
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("POST", "/events/1/1", bytes.NewBuffer(payload))
+	endpoint := fmt.Sprintf("/event/%v/1/", eKey)
+
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	response := executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, response.Code)
+}
+
+func TestPostExistingReport(t *testing.T) {
+	setupTables()
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	mKey, err := addMatch(eKey)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	payload := []byte(`{ "alliance": "red", "team": 2733, "score": 451,
+		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
+		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
+
+	endpoint := fmt.Sprintf("/events/%v/%v/", eKey, mKey)
+
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 	checkResponseCode(t, http.StatusCreated, response.Code)
 
-	req, _ = http.NewRequest("POST", "/events/1/1", bytes.NewBuffer(payload))
+	req, _ = http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response = executeRequest(req)
 	checkResponseCode(t, http.StatusConflict, response.Code)
 }
 
 func TestUpdateReport(t *testing.T) {
 	setupTables()
-	addEvents(1)
-	addMatches(1, 1)
-	addAlliances(1, 1, true)
-	addReports(1, 1, 2733)
+	eKey, err := addEvent()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	mKey, err := addMatch(eKey)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	id, err := addAlliance(mKey, true)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	err = addReports(id, 2733)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 
 	payload := []byte(`{ "alliance": "blue", "team": 2733, "score": 451,
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("PUT", "/events/1/1/2733", bytes.NewBuffer(payload))
+	endpoint := fmt.Sprintf("/events/%v/%v/2733/", eKey, mKey)
+
+	req, _ := http.NewRequest("PUT", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -285,7 +374,7 @@ func TestUpdateNonexistentReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("PUT", "/events/1/1/2733", bytes.NewBuffer(payload))
+	req, _ := http.NewRequest("PUT", "/events/Evnt1/1/2733/", bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusNotFound, response.Code)
