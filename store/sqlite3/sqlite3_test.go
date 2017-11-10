@@ -1,22 +1,35 @@
-// data_models_test.go
-
-package main
+package sqlite3
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/Pigmice2733/scouting-backend/server"
+	"github.com/Pigmice2733/scouting-backend/store"
 )
 
-var s *Server
+var s *server.Server
+var rawStore *service
 
 func TestMain(m *testing.M) {
-	s = New("file::memory:?mode=memory&cache=shared", os.Stdout, "", "dev")
+	store, err := NewFromFile("file::memory:?mode=memory&cache=shared")
+	if err != nil {
+		log.Fatalf("error creating database: %v\n", err)
+	}
+
+	var ok bool
+	if rawStore, ok = store.(*service); !ok {
+		log.Fatalf("cannot cast store to private type for testing")
+	}
+
+	s = server.New(store, os.Stdout, "", "dev")
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }
@@ -34,14 +47,14 @@ func setupTables() {
 }
 
 func ensureTableExists(creationQuery string) {
-	s.DB.Exec(creationQuery)
+	rawStore.db.Exec(creationQuery)
 }
 
 func clearTable(t string) {
 	delete := fmt.Sprintf("DELETE FROM %s", t)
-	s.DB.Exec(delete)
+	rawStore.db.Exec(delete)
 	resetID := fmt.Sprintf("UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM %s) WHERE name=\"%s\"", t, t)
-	s.DB.Exec(resetID)
+	rawStore.db.Exec(resetID)
 }
 
 func executeRequest(req *http.Request) *httptest.ResponseRecorder {
@@ -58,7 +71,7 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 }
 
 func addEvent() (string, error) {
-	_, err := s.DB.Exec("INSERT INTO events (key, name, date) VALUES (?, ?, ?)", "Evnt1", "Event 1", time.Now().UTC().Format(time.RFC3339))
+	_, err := rawStore.db.Exec("INSERT INTO events (key, name, date) VALUES (?, ?, ?)", "Evnt1", "Event 1", time.Now().UTC().Format(time.RFC3339))
 	if err != nil {
 		return "", err
 	}
@@ -66,7 +79,7 @@ func addEvent() (string, error) {
 }
 
 func addMatch(eKey string) (string, error) {
-	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey) VALUES (?, ?)", "Mtch1", eKey)
+	_, err := rawStore.db.Exec("INSERT INTO matches (key, eventKey) VALUES (?, ?)", "Mtch1", eKey)
 	if err != nil {
 		return "", err
 	}
@@ -74,7 +87,7 @@ func addMatch(eKey string) (string, error) {
 }
 
 func addFullMatch(eKey string, winningAlliance string) (string, error) {
-	_, err := s.DB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES (?, ?, ?)", "FullMatch", eKey, winningAlliance)
+	_, err := rawStore.db.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES (?, ?, ?)", "FullMatch", eKey, winningAlliance)
 	if err != nil {
 		return "", err
 	}
@@ -82,7 +95,7 @@ func addFullMatch(eKey string, winningAlliance string) (string, error) {
 }
 
 func addAlliance(matchKey string, isBlue bool) (int, error) {
-	res, err := s.DB.Exec("INSERT INTO alliances(matchKey, score, isBlue, team1, team2, team3) VALUES (?, ?, ?, ?, ?, ?)", matchKey, 451, isBlue, 0, 0, 0)
+	res, err := rawStore.db.Exec("INSERT INTO alliances(matchKey, score, isBlue, team1, team2, team3) VALUES (?, ?, ?, ?, ?, ?)", matchKey, 451, isBlue, 0, 0, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -94,12 +107,12 @@ func addAlliance(matchKey string, isBlue bool) (int, error) {
 }
 
 func addReports(allianceID int, team int) error {
-	_, err := s.DB.Exec("INSERT INTO reports(allianceID, teamNumber, score) VALUES (?, ?, ?)", allianceID, team, (allianceID * 25))
+	_, err := rawStore.db.Exec("INSERT INTO reports(allianceID, teamNumber, score) VALUES (?, ?, ?)", allianceID, team, (allianceID * 25))
 	if err != nil {
 		return err
 	}
 
-	_, err = s.DB.Exec("UPDATE alliances SET team1=? WHERE id=?", team, allianceID)
+	_, err = rawStore.db.Exec("UPDATE alliances SET team1=? WHERE id=?", team, allianceID)
 	if err != nil {
 		return err
 	}
@@ -132,7 +145,7 @@ func TestGetEventMultiple(t *testing.T) {
 
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	d := []event{}
+	d := []store.Event{}
 
 	json.Unmarshal(response.Body.Bytes(), &d)
 
@@ -160,7 +173,7 @@ func TestGetMatchMultiple(t *testing.T) {
 
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	fe := fullEvent{}
+	fe := store.FullEvent{}
 
 	json.Unmarshal(response.Body.Bytes(), &fe)
 
@@ -195,7 +208,7 @@ func TestGetMatchData(t *testing.T) {
 
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	fm := fullMatch{}
+	fm := store.FullMatch{}
 
 	json.Unmarshal(response.Body.Bytes(), &fm)
 
@@ -228,7 +241,7 @@ func TestAddValidReport(t *testing.T) {
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusCreated, response.Code)
-	report := reportData{}
+	report := store.ReportData{}
 	json.Unmarshal(response.Body.Bytes(), &report)
 
 	if report.Alliance != "red" {
@@ -238,8 +251,8 @@ func TestAddValidReport(t *testing.T) {
 		t.Errorf("Expected report team number to be '2733'. Got '%v' instead.", report.Team)
 	}
 
-	auto := &autoReport{CrossedLine: true, DeliveredGear: true, Fuel: 10}
-	teleop := &teleopReport{Climbed: true, Gears: 3, Fuel: 10}
+	auto := &store.AutoReport{CrossedLine: true, DeliveredGear: true, Fuel: 10}
+	teleop := &store.TeleopReport{Climbed: true, Gears: 3, Fuel: 10}
 
 	if report.Auto != *auto {
 		t.Errorf("Auto section of report was not as expected")
@@ -346,7 +359,7 @@ func TestUpdateReport(t *testing.T) {
 
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	report := reportData{}
+	report := store.ReportData{}
 	json.Unmarshal(response.Body.Bytes(), &report)
 
 	if report.Alliance != "blue" {
@@ -356,8 +369,8 @@ func TestUpdateReport(t *testing.T) {
 		t.Errorf("Expected updated report team number to be '2733'. Got '%v' instead.", report.Team)
 	}
 
-	auto := &autoReport{CrossedLine: true, DeliveredGear: true, Fuel: 10}
-	teleop := &teleopReport{Climbed: true, Gears: 3, Fuel: 10}
+	auto := &store.AutoReport{CrossedLine: true, DeliveredGear: true, Fuel: 10}
+	teleop := &store.TeleopReport{Climbed: true, Gears: 3, Fuel: 10}
 
 	if report.Auto != *auto {
 		t.Errorf("Auto section of report was not as expected")

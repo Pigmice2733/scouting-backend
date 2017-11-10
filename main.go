@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
+
+	"github.com/Pigmice2733/scouting-backend/server"
+	"github.com/Pigmice2733/scouting-backend/store/sqlite3"
 )
 
 func main() {
@@ -23,7 +27,12 @@ func main() {
 		environment = "dev"
 	}
 
-	server := New("scouting.db", os.Stdout, tbaAPIKey, environment)
+	store, err := sqlite3.NewFromFile("scouting.db")
+	if err != nil {
+		log.Fatalf("error creating db: %v\n", err)
+	}
+
+	server := server.New(store, os.Stdout, tbaAPIKey, environment)
 	server.PollTBA("2017")
 
 	server.Run(":" + port)

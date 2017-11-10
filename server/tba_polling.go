@@ -1,7 +1,6 @@
-package main
+package server
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,9 +8,10 @@ import (
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/logger"
+	"github.com/Pigmice2733/scouting-backend/store"
 )
 
-func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey string, year string) error {
+func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey string, year string) error {
 	type tbaEvent struct {
 		Key  string `json:"key"`
 		Name string `json:"name"`
@@ -26,7 +26,7 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 		return fmt.Errorf("TBA polling failed with error %s", err)
 	}
 
-	lastModified, err := eventsModifiedData(db)
+	lastModified, err := s.store.EventsModifiedData()
 	if err == nil {
 		req.Header.Set("If-Modified-Since", lastModified)
 	}
@@ -42,7 +42,7 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 
 	lastModified = response.Header.Get("Last-Modified")
 	if lastModified != "" {
-		setEventsModifiedData(db, lastModified)
+		s.store.SetEventsModifiedData(lastModified)
 	}
 
 	responseCode := response.StatusCode
@@ -60,7 +60,7 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 	}
 	json.Unmarshal(eventData, &tbaEvents)
 
-	var events []event
+	var events []store.Event
 
 	for _, tbaEvent := range tbaEvents {
 		date, err := time.Parse("2006-01-02", tbaEvent.Date)
@@ -68,7 +68,7 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 			logger.Debugf("Error TBA time data %v", err.Error())
 			continue
 		}
-		newEvent := event{
+		newEvent := store.Event{
 			Key:  tbaEvent.Key,
 			Name: tbaEvent.Name,
 			Date: date,
@@ -76,7 +76,7 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 		events = append(events, newEvent)
 	}
 
-	err = updateEvents(db, events)
+	err = s.store.UpdateEvents(events)
 	if err != nil {
 		return err
 	}
@@ -85,9 +85,9 @@ func pollTBAEvents(db *sql.DB, logger logger.Service, tbaAPI string, apikey stri
 	return nil
 }
 
-func pollTBAMatches(db *sql.DB, tbaAPI string, apikey string, eventKey string) ([]match, error) {
+func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) ([]store.Match, error) {
 	type tbaMatch struct {
-		Key    string `json:"key"`
+		Key string `json:"key"`
 	}
 	var tbaMatches []tbaMatch
 
@@ -98,7 +98,7 @@ func pollTBAMatches(db *sql.DB, tbaAPI string, apikey string, eventKey string) (
 		return nil, err
 	}
 
-	lastModified, err := matchModifiedData(db, eventKey)
+	lastModified, err := s.store.MatchModifiedData(eventKey)
 	if err == nil {
 		req.Header.Set("If-Modified-Since", lastModified)
 	}
@@ -114,7 +114,7 @@ func pollTBAMatches(db *sql.DB, tbaAPI string, apikey string, eventKey string) (
 
 	lastModified = response.Header.Get("Last-Modified")
 	if lastModified != "" {
-		setMatchModifiedData(db, lastModified, eventKey)
+		s.store.SetMatchModifiedData(lastModified, eventKey)
 	}
 
 	responseCode := response.StatusCode
@@ -131,78 +131,20 @@ func pollTBAMatches(db *sql.DB, tbaAPI string, apikey string, eventKey string) (
 	}
 	json.Unmarshal(matchData, &tbaMatches)
 
-	var matches []match
+	var matches []store.Match
 
 	for _, tbaMatch := range tbaMatches {
-		newMatch := match{
+		newMatch := store.Match{
 			Key:      tbaMatch.Key,
 			EventKey: eventKey,
 		}
 		matches = append(matches, newMatch)
 	}
 
-	err = updateMatches(db, matches)
+	err = s.store.UpdateMatches(matches)
 	if err != nil {
 		return nil, err
 	}
 
 	return matches, nil
-}
-
-func updateEvents(db *sql.DB, events []event) error {
-	for _, event := range events {
-		err := event.createEvent(db)
-		if err != nil {
-			return fmt.Errorf("Error processing TBA data '%v' in data '%v'", err.Error(), event)
-		}
-	}
-	return nil
-}
-
-func updateMatches(db *sql.DB, matches []match) error {
-	for _, match := range matches {
-		err := match.createMatch(db)
-		if err != nil {
-			return fmt.Errorf("Error processing TBA data '%v' in data '%v'", err.Error(), match)
-		}
-	}
-	return nil
-}
-
-func eventsModifiedData(db *sql.DB) (string, error) {
-	row := db.QueryRow("SELECT lastModified FROM tbaModified WHERE name=\"events\"")
-
-	var lastModified string
-	if err := row.Scan(&lastModified); err != nil {
-		return "", err
-	}
-	return lastModified, nil
-}
-
-func setEventsModifiedData(db *sql.DB, lastModified string) {
-	_, err := eventsModifiedData(db)
-	if err == sql.ErrNoRows {
-		db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (\"events\", ?)", lastModified)
-	} else {
-		db.Exec("UPDATE tbaModified SET lastModified=? WHERE name=\"events\"", lastModified)
-	}
-}
-
-func matchModifiedData(db *sql.DB, eventKey string) (string, error) {
-	row := db.QueryRow("SELECT lastModified FROM tbaModified WHERE name=?", eventKey)
-
-	var lastModified string
-	if err := row.Scan(&lastModified); err != nil {
-		return "", err
-	}
-	return lastModified, nil
-}
-
-func setMatchModifiedData(db *sql.DB, eventKey string, lastModified string) {
-	_, err := matchModifiedData(db, eventKey)
-	if err == sql.ErrNoRows {
-		db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (?, ?)", eventKey, lastModified)
-	} else {
-		db.Exec("UPDATE tbaModified SET lastModified=? WHERE name=?", lastModified, eventKey)
-	}
 }
