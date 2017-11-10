@@ -13,8 +13,8 @@ const eventTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS events
 (
 	key  TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    date TEXT NOT NULL
+	name TEXT NOT NULL,
+	date TEXT NOT NULL
 )`
 
 const matchTableCreationQuery = `
@@ -260,11 +260,6 @@ func (s *service) UpdateMatches(matches []store.Match) error {
 	return nil
 }
 
-func (s *service) ClearEventTable() {
-	s.db.Exec("DELETE FROM events")
-	s.db.Exec("UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM events) WHERE name=\"events\"")
-}
-
 func (s *service) EventsModifiedData() (string, error) {
 	row := s.db.QueryRow("SELECT lastModified FROM tbaModified WHERE name=\"events\"")
 
@@ -275,22 +270,25 @@ func (s *service) EventsModifiedData() (string, error) {
 	return lastModified, nil
 }
 
-func (s *service) SetEventsModifiedData(lastModified string) {
+func (s *service) SetEventsModifiedData(lastModified string) error {
 	_, err := s.EventsModifiedData()
 	if err == sql.ErrNoRows {
-		s.db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (\"events\", ?)", lastModified)
-	} else {
-		s.db.Exec("UPDATE tbaModified SET lastModified=? WHERE name=\"events\"", lastModified)
+		_, err = s.db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (\"events\", ?)", lastModified)
+		return err
 	}
+
+	_, err = s.db.Exec("UPDATE tbaModified SET lastModified=? WHERE name=\"events\"", lastModified)
+	return err
 }
 
-func (s *service) SetMatchModifiedData(eventKey string, lastModified string) {
-	_, err := s.MatchModifiedData(eventKey)
-	if err == sql.ErrNoRows {
-		s.db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (?, ?)", eventKey, lastModified)
-	} else {
-		s.db.Exec("UPDATE tbaModified SET lastModified=? WHERE name=?", lastModified, eventKey)
+func (s *service) SetMatchModifiedData(eventKey string, lastModified string) error {
+	if _, err := s.MatchModifiedData(eventKey); err == sql.ErrNoRows {
+		_, err := s.db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (?, ?)", eventKey, lastModified)
+		return err
 	}
+
+	_, err := s.db.Exec("UPDATE tbaModified SET lastModified=? WHERE name=?", lastModified, eventKey)
+	return err
 }
 
 func (s *service) MatchModifiedData(eventKey string) (string, error) {
@@ -300,18 +298,26 @@ func (s *service) MatchModifiedData(eventKey string) (string, error) {
 	if err := row.Scan(&lastModified); err != nil {
 		return "", err
 	}
+
 	return lastModified, nil
 }
 
-func (s *service) ensureTableExists(creationQuery string) {
-	if _, err := s.db.Exec(creationQuery); err != nil {
-		log.Fatal(err)
-	}
+func (s *service) ensureTableExists(creationQuery string) error {
+	_, err := s.db.Exec(creationQuery)
+	return err
 }
 
-func (s *service) clearTable(t string) {
-	delete := fmt.Sprintf("DELETE FROM %s", t)
-	s.db.Exec(delete)
-	resetID := fmt.Sprintf("UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM %s) WHERE name=\"%s\"", t, t)
-	s.db.Exec(resetID)
+func (s *service) clearTable(t string) error {
+	deleteTableContents := fmt.Sprintf("DELETE FROM %v", t)
+    if _, err := s.db.Exec(deleteTableContents); err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	deleteID := fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name='%v'", t)
+	_, err := s.db.Exec(deleteID)
+	if err.Error() != "no such table: sqlite_sequence" {
+		return err
+	}
+	return nil
 }

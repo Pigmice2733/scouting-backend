@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -52,14 +51,14 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 }
 
 // Run starts a running the server on the specified address
-func (s *Server) Run(addr string) {
-	s.logger.Infof("Server up and running!")
-	log.Fatal(http.ListenAndServe(addr, s.Router))
+func (s *Server) Run(addr string) error {
+	s.logger.Infof("server up and running")
+	return http.ListenAndServe(addr, s.Router)
 }
 
 // PollTBA polls The Blue Alliance api to populate database
-func (s *Server) PollTBA(year string) {
-	s.pollTBAEvents(s.logger, "https://www.thebluealliance.com/api/v3", s.tbaAPIKey, year)
+func (s *Server) PollTBA(year string) error {
+	return s.pollTBAEvents(s.logger, "https://www.thebluealliance.com/api/v3", s.tbaAPIKey, year)
 }
 
 func (s *Server) initializeRouter() {
@@ -71,7 +70,7 @@ func (s *Server) initializeRouter() {
 	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
 	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
 
-	s.logger.Infof("Initialized router...")
+	s.logger.Infof("initialized router...")
 }
 
 func wrapHandler(inner http.HandlerFunc, name string, logger logger.Service) http.Handler {
@@ -82,13 +81,14 @@ func generateEtag(content []byte) (string, error) {
 	hash := make([]byte, 32)
 	d := sha3.NewShake256()
 	// Write the response into the hash
-	d.Write(content)
-	// Read 32 bytes of output from the hash into h.
-	_, err := d.Read(hash)
-
-	if err != nil {
+	if _, err := d.Write(content); err != nil {
 		return "", err
 	}
+	// Read 32 bytes of output from the hash into h.
+	if _, err := d.Read(hash); err != nil {
+		return "", err
+	}
+
 	return hex.EncodeToString(hash), nil
 }
 
@@ -98,26 +98,47 @@ func respond(w http.ResponseWriter, code int, payload []byte) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	w.WriteHeader(code)
-	w.Write(payload)
+
+	if _, err := w.Write(payload); err != nil {
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+	}
+
+	return
 }
 
 func respondError(w http.ResponseWriter, code int, message string) {
-	payload, _ := json.Marshal(map[string]string{"error": message})
+	payload, err := json.Marshal(map[string]string{"error": message})
+	if err != nil {
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-cache")
 	respond(w, code, payload)
 }
 
 // Use for setter methods - POST, DELETE, etc.
 func respondSetJSON(w http.ResponseWriter, code int, payload interface{}) {
-	response, _ := json.Marshal(payload)
+	response, err := json.Marshal(payload)
+	if err != nil {
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-cache")
 	respond(w, code, response)
 }
 
 // Use for getter methods - GET, HEAD
 func respondGetJSON(w http.ResponseWriter, code int, payload interface{}, cacheMinutes int, ifNoneMatch []string) {
-	response, _ := json.Marshal(payload)
-	contentETag, _ := generateEtag(response)
+	response, err := json.Marshal(payload)
+	if err != nil {
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	contentETag, err := generateEtag(response)
+	if err != nil {
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
 
 	w.Header().Set("Cache-Control", cacheControl)
@@ -136,7 +157,7 @@ func respondGetJSON(w http.ResponseWriter, code int, payload interface{}, cacheM
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := s.store.GetEvents()
 	if err != nil {
-		s.logger.Debugf("Error in getEvents %s", err.Error())
+		s.logger.Debugf("error: getting events: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -158,7 +179,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "Non-existent event key")
 			return
 		}
-		s.logger.Debugf("Error in getEvent %s", err.Error())
+		s.logger.Debugf("error: getting events: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -169,7 +190,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 
 		matches, err = s.store.GetMatches(*e)
 		if err != nil && err != sql.ErrNoRows {
-			s.logger.Debugf("Error in getEvents %s", err.Error())
+			s.logger.Debugf("error: getting events: %v\n", err)
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -202,7 +223,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "Non-existent event key")
 			return
 		}
-		s.logger.Debugf("Error in getMatch %s", err.Error())
+		s.logger.Debugf("error: getting match: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -217,7 +238,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "Non-existent match key under event key")
 			return
 		}
-		s.logger.Debugf("Error in getMatch %s", err.Error())
+		s.logger.Debugf("error: getting match: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -239,7 +260,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	_, err = s.store.GetAlliance(redAlliance)
 	if err != nil && err != sql.ErrNoRows {
-		s.logger.Debugf("Error in getMatch %s", err.Error())
+		s.logger.Debugf("error: getting match: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -262,9 +283,8 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	matchKey := vars["matchKey"]
 
 	var report store.ReportData
-	decoder := json.NewDecoder(r.Body)
 
-	if err := decoder.Decode(&report); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -274,7 +294,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err != sql.ErrNoRows {
-			s.logger.Debugf("Error in postReport %s", err.Error())
+			s.logger.Debugf("error: nothing present in response: %v\n", err)
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -308,14 +328,14 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 
 		err := s.store.UpdateAlliance(a)
 		if err != nil {
-			s.logger.Debugf("Error in postReport %s", err.Error())
+			s.logger.Debugf("error: postreport: %v\n", err)
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
 
 	if err := s.store.CreateReport(report, allianceID); err != nil {
-		s.logger.Debugf("Error in postReport %s", err.Error())
+		s.logger.Debugf("error: postreport: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -346,7 +366,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 		if err == sql.ErrNoRows {
 			respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
 		} else {
-			s.logger.Debugf("Error in updateReport %s", err.Error())
+			s.logger.Debugf("error: updateReport %v\n", err)
 			respondError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
@@ -364,7 +384,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.store.UpdateReport(report, allianceID); err != nil {
-		s.logger.Debugf("Error in updateReport %v\n", err)
+		s.logger.Debugf("error: updateReport %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -392,7 +412,7 @@ func (s *Server) createEvents(events []store.Event) error {
 	for _, event := range events {
 		err := s.store.CreateEvent(event)
 		if err != nil {
-			s.logger.Errorf("Error processing TBA data '%s' in data '%v'", err.Error(), event)
+			s.logger.Errorf("error: processing TBA data '%v' in data '%v'\n", err, event)
 			return err
 		}
 	}

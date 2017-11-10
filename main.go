@@ -33,7 +33,12 @@ func main() {
 	}
 
 	server := server.New(store, os.Stdout, tbaAPIKey, environment)
-	server.PollTBA("2017")
 
-	server.Run(":" + port)
+	if err := server.PollTBA("2017"); err != nil {
+		fmt.Printf("error polling TBA: %v\n", err)
+	}
+
+	if err := server.Run(":" + port); err != nil {
+		fmt.Printf("server died with error: %v\n", err)
+	}
 }

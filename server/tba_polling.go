@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -23,7 +23,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 
 	req, err := http.NewRequest("GET", eventsEndpoint, nil)
 	if err != nil {
-		return fmt.Errorf("TBA polling failed with error %s", err)
+		return fmt.Errorf("error: TBA polling failed: %v", err)
 	}
 
 	lastModified, err := s.store.EventsModifiedData()
@@ -37,12 +37,14 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 	response, err := client.Do(req)
 
 	if err != nil {
-		return fmt.Errorf("TBA polling request failed with error %s", err)
+		return fmt.Errorf("error: TBA polling request failed: %v", err)
 	}
 
 	lastModified = response.Header.Get("Last-Modified")
 	if lastModified != "" {
-		s.store.SetEventsModifiedData(lastModified)
+		if err := s.store.SetEventsModifiedData(lastModified); err != nil {
+			return err
+		}
 	}
 
 	responseCode := response.StatusCode
@@ -54,18 +56,16 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 		return fmt.Errorf("TBA polling request failed with status %d", responseCode)
 	}
 
-	eventData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return fmt.Errorf("Error reading TBA response")
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1.049e+6)).Decode(&tbaEvents); err != nil {
+		return fmt.Errorf("error: reading TBA response: %v", err)
 	}
-	json.Unmarshal(eventData, &tbaEvents)
 
 	var events []store.Event
 
 	for _, tbaEvent := range tbaEvents {
 		date, err := time.Parse("2006-01-02", tbaEvent.Date)
 		if err != nil {
-			logger.Debugf("Error TBA time data %v", err.Error())
+			logger.Debugf("error parsing TBA time data: %v\n", err)
 			continue
 		}
 		newEvent := store.Event{
@@ -78,7 +78,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 
 	err = s.store.UpdateEvents(events)
 	if err != nil {
-		return err
+		return fmt.Errorf("error: updating events: %v", err)
 	}
 
 	logger.Infof("Polled TBA...")
@@ -114,7 +114,9 @@ func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) (
 
 	lastModified = response.Header.Get("Last-Modified")
 	if lastModified != "" {
-		s.store.SetMatchModifiedData(lastModified, eventKey)
+		if err := s.store.SetMatchModifiedData(lastModified, eventKey); err != nil {
+			return nil, err
+		}
 	}
 
 	responseCode := response.StatusCode
@@ -122,14 +124,12 @@ func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) (
 	if responseCode == http.StatusNotModified {
 		return nil, nil
 	} else if responseCode != http.StatusOK {
-		return nil, fmt.Errorf("TBA polling request failed with status %v", responseCode)
+		return nil, fmt.Errorf("error: TBA polling request failed with status: %v", responseCode)
 	}
 
-	matchData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&tbaMatches); err != nil {
 		return nil, err
 	}
-	json.Unmarshal(matchData, &tbaMatches)
 
 	var matches []store.Match
 

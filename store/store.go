@@ -20,8 +20,8 @@ type Service interface {
 	UpdateEvents(events []Event) error
 	UpdateMatches(matches []Match) error
 	EventsModifiedData() (string, error)
-	SetEventsModifiedData(lastModified string)
-	SetMatchModifiedData(eventKey string, lastModified string)
+	SetEventsModifiedData(lastModified string) error
+	SetMatchModifiedData(eventKey string, lastModified string) error
 	MatchModifiedData(eventKey string) (string, error)
 }
 

@@ -34,27 +34,32 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func setupTables() {
-	ensureTableExists(eventTableCreationQuery)
-	ensureTableExists(matchTableCreationQuery)
-	ensureTableExists(allianceTableCreationQuery)
-	ensureTableExists(reportTableCreationQuery)
+func setupTables() error {
+	if err := ensureTableExists(eventTableCreationQuery); err != nil {
+		return fmt.Errorf("error: ensuring event table exists: %v", err)
+	}
+	if err := ensureTableExists(matchTableCreationQuery); err != nil {
+		return fmt.Errorf("error: ensuring match table exists: %v", err)
+	}
+	if err := ensureTableExists(allianceTableCreationQuery); err != nil {
+		return fmt.Errorf("error: ensuring alliance table exists: %v", err)
+	}
+	if err := ensureTableExists(reportTableCreationQuery); err != nil {
+		return fmt.Errorf("error: ensuring report table exists: %v", err)
+	}
+
 	// Order matters!
-	clearTable("reports")
-	clearTable("alliances")
-	clearTable("matches")
-	clearTable("events")
+	rawStore.clearTable("reports")
+	rawStore.clearTable("alliances")
+	rawStore.clearTable("matches")
+	rawStore.clearTable("events")
+
+	return nil
 }
 
-func ensureTableExists(creationQuery string) {
-	rawStore.db.Exec(creationQuery)
-}
-
-func clearTable(t string) {
-	delete := fmt.Sprintf("DELETE FROM %s", t)
-	rawStore.db.Exec(delete)
-	resetID := fmt.Sprintf("UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM %s) WHERE name=\"%s\"", t, t)
-	rawStore.db.Exec(resetID)
+func ensureTableExists(creationQuery string) error {
+	_, err := rawStore.db.Exec(creationQuery)
+	return err
 }
 
 func executeRequest(req *http.Request) *httptest.ResponseRecorder {
@@ -66,7 +71,7 @@ func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 
 func checkResponseCode(t *testing.T, expected, actual int) {
 	if expected != actual {
-		t.Errorf("Expected response code %d. Got %d\n", expected, actual)
+		t.Errorf("error: expected response code %d, got %d\n", expected, actual)
 	}
 }
 
@@ -120,7 +125,9 @@ func addReports(allianceID int, team int) error {
 }
 
 func TestEmptyEventTable(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
 
 	req, _ := http.NewRequest("GET", "/events", nil)
 	response := executeRequest(req)
@@ -128,12 +135,14 @@ func TestEmptyEventTable(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, response.Code)
 
 	if body := response.Body.String(); body != "[]" {
-		t.Errorf("Expected an empty array. Got %v", body)
+		t.Errorf("error: expected an empty array. Got %v", body)
 	}
 }
 
 func TestGetEventMultiple(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
 
 	_, err := addEvent()
 	if err != nil {
@@ -147,15 +156,19 @@ func TestGetEventMultiple(t *testing.T) {
 
 	d := []store.Event{}
 
-	json.Unmarshal(response.Body.Bytes(), &d)
+	if err := json.Unmarshal(response.Body.Bytes(), &d); err != nil {
+		t.Errorf("error: unmarshalling body: %v\n", err)
+	}
 
 	if d[0].Name != "Event 1" {
-		t.Errorf("Expected event name to be 'Event 1'. Got '%v' instead.", d[0].Name)
+		t.Errorf("error: expected event name to be 'Event 1'. Got '%v' instead.", d[0].Name)
 	}
 }
 
 func TestGetMatchMultiple(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
 
 	eKey, err := addEvent()
 	if err != nil {
@@ -175,15 +188,20 @@ func TestGetMatchMultiple(t *testing.T) {
 
 	fe := store.FullEvent{}
 
-	json.Unmarshal(response.Body.Bytes(), &fe)
+    if err := json.NewDecoder(response.Body).Decode(&fe); err != nil {
+		t.Errorf("error: unmarshalling body: %v\n", err)
+	}
 
 	if fe.Matches[0].EventKey != eKey {
-		t.Errorf("Expected event key to be '%v'. Got '%v' instead.", eKey, fe.Matches[0].EventKey)
+		t.Errorf("error: expected event key to be '%v'. Got '%v' instead.", eKey, fe.Matches[0].EventKey)
 	}
 }
 
 func TestGetMatchData(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
+
 	eKey, err := addEvent()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -210,18 +228,23 @@ func TestGetMatchData(t *testing.T) {
 
 	fm := store.FullMatch{}
 
-	json.Unmarshal(response.Body.Bytes(), &fm)
+	if err := json.NewDecoder(response.Body).Decode(&fm); err != nil {
+		t.Errorf("error: unmarshalling body: %v\n", err)
+	}
 
 	if fm.EventKey != eKey {
-		t.Errorf("Expected event key to be '%v'. Got '%v' instead.", eKey, fm.EventKey)
+		t.Errorf("error: expected event key to be '%v'. Got '%v' instead.", eKey, fm.EventKey)
 	}
 	if fm.WinningAlliance != "blue" {
-		t.Errorf("Expected match winning alliance to be 'blue'. Got '%v' instead.", fm.WinningAlliance)
+		t.Errorf("error: expected match winning alliance to be 'blue'. Got '%v' instead.", fm.WinningAlliance)
 	}
 }
 
 func TestAddValidReport(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
+
 	eKey, err := addEvent()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -242,28 +265,34 @@ func TestAddValidReport(t *testing.T) {
 
 	checkResponseCode(t, http.StatusCreated, response.Code)
 	report := store.ReportData{}
-	json.Unmarshal(response.Body.Bytes(), &report)
+
+	if err := json.NewDecoder(response.Body).Decode(&report); err != nil {
+		t.Errorf("error: unmarshalling body: %v\n", err)
+	}
 
 	if report.Alliance != "red" {
-		t.Errorf("Expected report alliance to be 'red'. Got '%v' instead.", report.Alliance)
+		t.Errorf("error: expected report alliance to be 'red'. Got '%v' instead.", report.Alliance)
 	}
 	if report.Team != 2733 {
-		t.Errorf("Expected report team number to be '2733'. Got '%v' instead.", report.Team)
+		t.Errorf("error: expected report team number to be '2733'. Got '%v' instead.", report.Team)
 	}
 
 	auto := &store.AutoReport{CrossedLine: true, DeliveredGear: true, Fuel: 10}
 	teleop := &store.TeleopReport{Climbed: true, Gears: 3, Fuel: 10}
 
 	if report.Auto != *auto {
-		t.Errorf("Auto section of report was not as expected")
+		t.Errorf("error: auto section of report was not as expected")
 	}
 	if report.Teleop != *teleop {
-		t.Errorf("Teleop section of report was not as expected")
+		t.Errorf("error: teleop section of report was not as expected")
 	}
 }
 
 func TestAddInvalidReport(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
+
 	eKey, err := addEvent()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -286,7 +315,10 @@ func TestAddInvalidReport(t *testing.T) {
 }
 
 func TestPostReportFakeMatch(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
+
 	eKey, err := addEvent()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -304,7 +336,10 @@ func TestPostReportFakeMatch(t *testing.T) {
 }
 
 func TestPostExistingReport(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
+
 	eKey, err := addEvent()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -330,7 +365,10 @@ func TestPostExistingReport(t *testing.T) {
 }
 
 func TestUpdateReport(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
+
 	eKey, err := addEvent()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -360,28 +398,33 @@ func TestUpdateReport(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, response.Code)
 
 	report := store.ReportData{}
-	json.Unmarshal(response.Body.Bytes(), &report)
+
+	if err := json.NewDecoder(response.Body).Decode(&report); err != nil {
+		t.Errorf("error: unmarshalling body: %v\n", err)
+	}
 
 	if report.Alliance != "blue" {
-		t.Errorf("Expected updated report alliance to be 'blue'. Got '%v' instead.", report.Alliance)
+		t.Errorf("error: expected updated report alliance to be 'blue'. Got '%v' instead.", report.Alliance)
 	}
 	if report.Team != 2733 {
-		t.Errorf("Expected updated report team number to be '2733'. Got '%v' instead.", report.Team)
+		t.Errorf("error: expected updated report team number to be '2733'. Got '%v' instead.", report.Team)
 	}
 
 	auto := &store.AutoReport{CrossedLine: true, DeliveredGear: true, Fuel: 10}
 	teleop := &store.TeleopReport{Climbed: true, Gears: 3, Fuel: 10}
 
 	if report.Auto != *auto {
-		t.Errorf("Auto section of report was not as expected")
+		t.Errorf("error: auto section of report was not as expected")
 	}
 	if report.Teleop != *teleop {
-		t.Errorf("Teleop section of report was not as expected")
+		t.Errorf("error: teleop section of report was not as expected")
 	}
 }
 
 func TestUpdateNonexistentReport(t *testing.T) {
-	setupTables()
+	if err := setupTables(); err != nil {
+		t.Fatalf("error: setting up tables: %v\n", err)
+	}
 
 	payload := []byte(`{ "alliance": "red", "team": 2733, "score": 451,
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
