@@ -15,6 +15,24 @@
 			"revisionTime": "2017-11-09T10:16:14Z"
 		},
 		{
+			"checksumSHA1": "UvebLYkZtnJTaV41CfMALJmmexo=",
+			"path": "github.com/Pigmice2733/scouting-backend/server",
+			"revision": "92cfd168d5a97833002b4ce55885936910b1110d",
+			"revisionTime": "2017-11-10T00:44:58Z"
+		},
+		{
+			"checksumSHA1": "g5jryET8nImN3+nMoPConjQ9c74=",
+			"path": "github.com/Pigmice2733/scouting-backend/store",
+			"revision": "92cfd168d5a97833002b4ce55885936910b1110d",
+			"revisionTime": "2017-11-10T00:44:58Z"
+		},
+		{
+			"checksumSHA1": "wobiMPB6haguTUPjcCRt1oBrGnc=",
+			"path": "github.com/Pigmice2733/scouting-backend/store/sqlite3",
+			"revision": "92cfd168d5a97833002b4ce55885936910b1110d",
+			"revisionTime": "2017-11-10T00:44:58Z"
+		},
+		{
 			"checksumSHA1": "AmUpXnVfk96T4KPgcYOLM4Gv/LE=",
 			"path": "github.com/gorilla/mux",
 			"revision": "2d5fef06b891c971b14aa6f71ca5ab6c03a36e0e",

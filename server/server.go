@@ -166,13 +166,13 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	matches, err := s.pollTBAMatches("https://www.thebluealliance.com/api/v3", s.tbaAPIKey, e.Key)
 	if err != nil {
 		s.logger.Infof(err.Error())
-	}
 
-	matches, err = s.store.GetMatches(*e)
-	if err != nil && err != sql.ErrNoRows {
-		s.logger.Debugf("Error in getEvents %s", err.Error())
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		matches, err = s.store.GetMatches(*e)
+		if err != nil && err != sql.ErrNoRows {
+			s.logger.Debugf("Error in getEvents %s", err.Error())
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	fullEvent := &store.FullEvent{
