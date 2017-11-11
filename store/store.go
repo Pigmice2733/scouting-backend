@@ -1,8 +1,12 @@
 package store
 
 import (
+	"fmt"
 	"time"
 )
+
+// ErrNoResults is a generic error of sql.ErrNoRows
+var ErrNoResults = fmt.Errorf("no results returned")
 
 // Service is a storage interface for event, match, alliance, and report CRUD
 type Service interface {

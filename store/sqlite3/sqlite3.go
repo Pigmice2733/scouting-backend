@@ -106,6 +106,9 @@ func (s *service) GetEvents() ([]store.Event, error) {
 	rows, err := s.db.Query("SELECT key, name, date FROM events")
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, store.ErrNoResults
+		}
 		return nil, err
 	}
 
@@ -136,6 +139,9 @@ func (s *service) GetEvent(e *store.Event) error {
 	var dateString string
 
 	if err := row.Scan(&e.Name, &dateString); err != nil {
+		if err == sql.ErrNoRows {
+			return store.ErrNoResults
+		}
 		return err
 	}
 
@@ -157,8 +163,10 @@ func (s *service) GetMatch(m *store.Match) error {
 	row := s.db.QueryRow("SELECT winningAlliance FROM matches WHERE eventKey=? AND key=?", m.EventKey, m.Key)
 
 	var winningAlliance sql.NullString
-	err := row.Scan(&winningAlliance)
-	if err != nil {
+	if err := row.Scan(&winningAlliance); err != nil {
+		if err == sql.ErrNoRows {
+			return store.ErrNoResults
+		}
 		return err
 	}
 
@@ -174,6 +182,9 @@ func (s *service) GetMatches(e store.Event) ([]store.Match, error) {
 	rows, err := s.db.Query("SELECT key, eventKey, winningAlliance FROM matches WHERE eventKey=?", e.Key)
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, store.ErrNoResults
+		}
 		return nil, err
 	}
 
@@ -208,6 +219,11 @@ func (s *service) GetAlliance(a *store.Alliance) (int, error) {
 
 	var allianceID int
 	err := row.Scan(&allianceID, &a.Score, &a.Team1, &a.Team2, &a.Team3)
+
+	if err == sql.ErrNoRows {
+		return allianceID, store.ErrNoResults
+	}
+
 	return allianceID, err
 }
 
@@ -244,7 +260,7 @@ func (s *service) UpdateEvents(events []store.Event) error {
 	for _, event := range events {
 		err := s.CreateEvent(event)
 		if err != nil {
-			return fmt.Errorf("Error processing TBA data '%v' in data '%v'", err.Error(), event)
+			return fmt.Errorf("error processing TBA data '%v' in data '%v'", err.Error(), event)
 		}
 	}
 	return nil
@@ -254,7 +270,7 @@ func (s *service) UpdateMatches(matches []store.Match) error {
 	for _, match := range matches {
 		err := s.CreateMatch(match)
 		if err != nil {
-			return fmt.Errorf("Error processing TBA data '%v' in data '%v'", err.Error(), match)
+			return fmt.Errorf("error processing TBA data '%v' in data '%v'", err.Error(), match)
 		}
 	}
 	return nil
@@ -265,6 +281,9 @@ func (s *service) EventsModifiedData() (string, error) {
 
 	var lastModified string
 	if err := row.Scan(&lastModified); err != nil {
+		if err == sql.ErrNoRows {
+			return "", store.ErrNoResults
+		}
 		return "", err
 	}
 	return lastModified, nil
@@ -309,7 +328,7 @@ func (s *service) ensureTableExists(creationQuery string) error {
 
 func (s *service) clearTable(t string) error {
 	deleteTableContents := fmt.Sprintf("DELETE FROM %v", t)
-    if _, err := s.db.Exec(deleteTableContents); err != nil {
+	if _, err := s.db.Exec(deleteTableContents); err != nil {
 		fmt.Println(err)
 		return err
 	}

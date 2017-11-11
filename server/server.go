@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -175,7 +174,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	err := s.store.GetEvent(e)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == store.ErrNoResults {
 			respondError(w, http.StatusNotFound, "Non-existent event key")
 			return
 		}
@@ -189,7 +188,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		s.logger.Infof(err.Error())
 
 		matches, err = s.store.GetMatches(*e)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && err != store.ErrNoResults {
 			s.logger.Debugf("error: getting events: %v\n", err)
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -219,7 +218,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	err := s.store.GetEvent(e)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == store.ErrNoResults {
 			respondError(w, http.StatusNotFound, "Non-existent event key")
 			return
 		}
@@ -234,7 +233,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	err = s.store.GetMatch(partialMatch)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == store.ErrNoResults {
 			respondError(w, http.StatusNotFound, "Non-existent match key under event key")
 			return
 		}
@@ -253,13 +252,13 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = s.store.GetAlliance(blueAlliance)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && err != store.ErrNoResults {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	_, err = s.store.GetAlliance(redAlliance)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && err != store.ErrNoResults {
 		s.logger.Debugf("error: getting match: %v\n", err)
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -293,7 +292,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	allianceID, a, err := s.findAlliance(matchKey, report)
 
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if err != store.ErrNoResults {
 			s.logger.Debugf("error: nothing present in response: %v\n", err)
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -363,7 +362,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == store.ErrNoResults {
 			respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
 		} else {
 			s.logger.Debugf("error: updateReport %v\n", err)
