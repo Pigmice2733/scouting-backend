@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/Pigmice2733/scouting-backend/store"
+	"github.com/Pigmice2733/scouting-backend/server/store"
 	// Register mattn/go-sqlite
 	_ "github.com/mattn/go-sqlite3"
 )

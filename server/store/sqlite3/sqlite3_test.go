@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/server"
-	"github.com/Pigmice2733/scouting-backend/store"
+	"github.com/Pigmice2733/scouting-backend/server/store"
 )
 
 var s *server.Server
@@ -188,7 +188,7 @@ func TestGetMatchMultiple(t *testing.T) {
 
 	fe := store.FullEvent{}
 
-    if err := json.NewDecoder(response.Body).Decode(&fe); err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&fe); err != nil {
 		t.Errorf("error: unmarshalling body: %v\n", err)
 	}
 

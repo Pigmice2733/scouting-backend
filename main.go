@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/Pigmice2733/scouting-backend/server"
-	"github.com/Pigmice2733/scouting-backend/store/sqlite3"
+	"github.com/Pigmice2733/scouting-backend/server/store/sqlite3"
 )
 
 func main() {

@@ -9,8 +9,8 @@ import (
 	"strconv"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/Pigmice2733/scouting-backend/logger"
-	"github.com/Pigmice2733/scouting-backend/store"
+	"github.com/Pigmice2733/scouting-backend/server/logger"
+	"github.com/Pigmice2733/scouting-backend/server/store"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/sha3"
 )
