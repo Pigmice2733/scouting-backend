@@ -12,7 +12,6 @@ import (
 	"github.com/Pigmice2733/scouting-backend/logger"
 	"github.com/Pigmice2733/scouting-backend/store"
 	"github.com/gorilla/mux"
-	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -63,17 +62,17 @@ func (s *Server) PollTBA(year string) error {
 func (s *Server) initializeRouter() {
 	s.Router = mux.NewRouter().StrictSlash(true)
 
-	s.Router.Handle("/events", wrapHandler(s.getEvents, "getEvents", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}", wrapHandler(s.getEvent, "getEvent", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.getMatch, "getMatch", s.logger)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.postReport, "postReport", s.logger)).Methods("POST")
-	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", wrapHandler(s.updateReport, "putReport", s.logger)).Methods("PUT")
+	s.Router.Handle("/events", wrapHandler(s.getEvents, s.logger, 1440)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}", wrapHandler(s.getEvent, s.logger, 1)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.getMatch, s.logger, 1)).Methods("GET")
+	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.postReport, s.logger, 1)).Methods("POST")
+	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", wrapHandler(s.updateReport, s.logger, 1)).Methods("PUT")
 
 	s.logger.Infof("initialized router...")
 }
 
-func wrapHandler(inner http.HandlerFunc, name string, logger logger.Service) http.Handler {
-	return gziphandler.GzipHandler(logger.Middleware(inner, name))
+func wrapHandler(inner func(io.ReadCloser, map[string]string) (interface{}, int), logger logger.Service, cacheMinutes int) http.Handler {
+	return gziphandler.GzipHandler(logger.Middleware(requestHandler(logger, cacheMinutes, inner)))
 }
 
 func generateEtag(content []byte) (string, error) {
@@ -91,83 +90,74 @@ func generateEtag(content []byte) (string, error) {
 	return hex.EncodeToString(hash), nil
 }
 
-func respond(w http.ResponseWriter, code int, payload []byte) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Vary", "Accept-Encoding")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	w.WriteHeader(code)
-
-	if _, err := w.Write(payload); err != nil {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+func isError(statusCode int) bool {
+	// HTTP error codes are status codes 4xx-5xx
+	if statusCode >= 400 && statusCode < 600 {
+		return true
 	}
-
-	return
+	return false
 }
 
-func respondError(w http.ResponseWriter, code int, message string) {
-	payload, err := json.Marshal(map[string]string{"error": message})
-	if err != nil {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Cache-Control", "no-cache")
-	respond(w, code, payload)
-}
+func requestHandler(logger logger.Service, cacheMinutes int, inner func(io.ReadCloser, map[string]string) (interface{}, int)) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-// Use for setter methods - POST, DELETE, etc.
-func respondSetJSON(w http.ResponseWriter, code int, payload interface{}) {
-	response, err := json.Marshal(payload)
-	if err != nil {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Cache-Control", "no-cache")
-	respond(w, code, response)
-}
+		vars := mux.Vars(r)
 
-// Use for getter methods - GET, HEAD
-func respondGetJSON(w http.ResponseWriter, code int, payload interface{}, cacheMinutes int, ifNoneMatch []string) {
-	response, err := json.Marshal(payload)
-	if err != nil {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	contentETag, err := generateEtag(response)
-	if err != nil {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
+		payload, status := inner(r.Body, vars)
+		ifNoneMatch := r.Header["If-None-Match"]
 
-	w.Header().Set("Cache-Control", cacheControl)
-	w.Header().Set("ETag", contentETag)
-
-	for _, eTag := range ifNoneMatch {
-		if eTag == contentETag {
-			respond(w, http.StatusNotModified, nil)
+		if isError(status) {
+			http.Error(w, payload.(string), status)
 			return
 		}
-	}
 
-	respond(w, code, response)
+		response, err := json.Marshal(payload)
+		if err != nil {
+			logger.Errorf("error: marshalling json response %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		contentETag, err := generateEtag(response)
+		if err != nil {
+			logger.Errorf("error: generating eTag %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
+		if cacheMinutes == 0 {
+			cacheControl = "no-cache"
+		}
+
+		for _, eTag := range ifNoneMatch {
+			if eTag == contentETag {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+		w.Header().Set("Cache-Control", cacheControl)
+		w.Header().Set("ETag", contentETag)
+		w.WriteHeader(status)
+		if _, err := w.Write(response); err != nil {
+			logger.Errorf("error: writing json []byte response %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+	})
 }
 
-func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getEvents(data io.ReadCloser, vars map[string]string) (interface{}, int) {
 	events, err := s.store.GetEvents()
 	if err != nil {
-		s.logger.Debugf("error: getting events: %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: getting events: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
-
-	ifNoneMatch := r.Header["If-None-Match"]
-	// Cache for 24 hours = 1440 minutes
-	respondGetJSON(w, http.StatusOK, events, 1440, ifNoneMatch)
+	return events, http.StatusOK
 }
 
-func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (s *Server) getEvent(data io.ReadCloser, vars map[string]string) (interface{}, int) {
 	eventKey := vars["eventKey"]
 	e := &store.Event{
 		Key: eventKey,
@@ -175,12 +165,10 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	err := s.store.GetEvent(e)
 	if err != nil {
 		if err == store.ErrNoResults {
-			respondError(w, http.StatusNotFound, "Non-existent event key")
-			return
+			return "non-existent event key", http.StatusNotFound
 		}
-		s.logger.Debugf("error: getting events: %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: getting events: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
 	matches, err := s.pollTBAMatches("https://www.thebluealliance.com/api/v3", s.tbaAPIKey, e.Key)
@@ -189,9 +177,8 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 
 		matches, err = s.store.GetMatches(*e)
 		if err != nil && err != store.ErrNoResults {
-			s.logger.Debugf("error: getting events: %v\n", err)
-			respondError(w, http.StatusInternalServerError, err.Error())
-			return
+			s.logger.Errorf("error: getting events: %v\n", err)
+			return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 		}
 	}
 
@@ -202,13 +189,10 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		Matches: matches,
 	}
 
-	ifNoneMatch := r.Header["If-None-Match"]
-	// Cache for 1 minute
-	respondGetJSON(w, http.StatusOK, fullEvent, 1, ifNoneMatch)
+	return fullEvent, http.StatusOK
 }
 
-func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (s *Server) getMatch(data io.ReadCloser, vars map[string]string) (interface{}, int) {
 	eventKey := vars["eventKey"]
 	matchKey := vars["matchKey"]
 	e := &store.Event{
@@ -219,13 +203,12 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == store.ErrNoResults {
-			respondError(w, http.StatusNotFound, "Non-existent event key")
-			return
+			return "non-existent event key", http.StatusNotFound
 		}
-		s.logger.Debugf("error: getting match: %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: getting match: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
+
 	partialMatch := &store.Match{
 		Key:      matchKey,
 		EventKey: eventKey,
@@ -234,12 +217,11 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == store.ErrNoResults {
-			respondError(w, http.StatusNotFound, "Non-existent match key under event key")
-			return
+			message := fmt.Sprintf("non-existent match key '%v' under event key '%v'", matchKey, eventKey)
+			return message, http.StatusNotFound
 		}
-		s.logger.Debugf("error: getting match: %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: getting match: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
 	blueAlliance := &store.Alliance{
@@ -253,15 +235,14 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	_, err = s.store.GetAlliance(blueAlliance)
 	if err != nil && err != store.ErrNoResults {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: getting alliance: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
 	_, err = s.store.GetAlliance(redAlliance)
 	if err != nil && err != store.ErrNoResults {
-		s.logger.Debugf("error: getting match: %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: getting alliance: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
 	fullMatch := &store.FullMatch{
@@ -272,36 +253,30 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 		BlueAlliance:    *blueAlliance,
 	}
 
-	ifNoneMatch := r.Header["If-None-Match"]
-	// Cache for 1 minute
-	respondGetJSON(w, http.StatusOK, fullMatch, 1, ifNoneMatch)
+	return fullMatch, http.StatusOK
 }
 
-func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (s *Server) postReport(data io.ReadCloser, vars map[string]string) (interface{}, int) {
 	matchKey := vars["matchKey"]
 
 	var report store.ReportData
 
-	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request payload")
-		return
+	if err := json.NewDecoder(data).Decode(&report); err != nil {
+		return "invalid request payload", http.StatusBadRequest
 	}
-	defer r.Body.Close()
+	defer data.Close()
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
 
 	if err != nil {
 		if err != store.ErrNoResults {
-			s.logger.Debugf("error: nothing present in response: %v\n", err)
-			respondError(w, http.StatusInternalServerError, err.Error())
-			return
+			s.logger.Errorf("error: nothing present in response: %v\n", err)
+			return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 		}
 		a.Team1 = report.Team
 		allianceID, err = s.store.CreateAlliance(a)
 		if err != nil {
-			respondError(w, http.StatusBadRequest, err.Error())
-			return
+			return "no corresponding match for posted report", http.StatusBadRequest
 		}
 	} else {
 		teamReportAlreadyExists := false
@@ -317,78 +292,68 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 			}
 			a.Team3 = report.Team
 		default:
-			respondError(w, http.StatusBadRequest, "More than three reports for a single alliance not permitted")
-			return
+			return "more than three reports for a single alliance not permitted", http.StatusBadRequest
 		}
 
 		if teamReportAlreadyExists {
-			respondError(w, http.StatusConflict, "Report post for team already exists, use 'PUT' to update")
+			return "report for team already exists, use 'PUT' to update", http.StatusConflict
 		}
 
 		err := s.store.UpdateAlliance(a)
 		if err != nil {
-			s.logger.Debugf("error: postreport: %v\n", err)
-			respondError(w, http.StatusInternalServerError, err.Error())
-			return
+			s.logger.Errorf("error: postreport: %v\n", err)
+			return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 		}
 	}
 
 	if err := s.store.CreateReport(report, allianceID); err != nil {
-		s.logger.Debugf("error: postreport: %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: postreport: %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
-	respondSetJSON(w, http.StatusCreated, report)
+	return report, http.StatusCreated
 }
 
-func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (s *Server) updateReport(data io.ReadCloser, vars map[string]string) (interface{}, int) {
 	matchKey := vars["matchKey"]
 	teamNumber, err := strconv.Atoi(vars["team"])
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid team number")
-		return
+		return "invalid team number", http.StatusBadRequest
 	}
 
 	var report store.ReportData
-	decoder := json.NewDecoder(r.Body)
+	decoder := json.NewDecoder(data)
 
 	if err := decoder.Decode(&report); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request payload")
-		return
+		return "invalid request payload", http.StatusBadRequest
 	}
-	defer r.Body.Close()
+	defer data.Close()
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
 	if err != nil {
 		if err == store.ErrNoResults {
-			respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
-		} else {
-			s.logger.Debugf("error: updateReport %v\n", err)
-			respondError(w, http.StatusInternalServerError, err.Error())
+			return "report does not exist, use 'POST' to create a report", http.StatusNotFound
 		}
-		return
+		s.logger.Errorf("error: updateReport %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
 	teamReportExists := (a.Team1 == report.Team || a.Team2 == report.Team || a.Team3 == report.Team)
 
 	if !teamReportExists {
-		respondError(w, http.StatusNotFound, "Report does not exist, use 'POST' to create a report")
+		return "report does not exist, use 'POST' to create a report", http.StatusNotFound
 	}
 
 	if report.Team != teamNumber {
-		respondError(w, http.StatusBadRequest, "Report team does not match team specified in URI")
-		return
+		return "report team does not match team specified in URI", http.StatusBadRequest
 	}
 
 	if err := s.store.UpdateReport(report, allianceID); err != nil {
-		s.logger.Debugf("error: updateReport %v\n", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+		s.logger.Errorf("error: updateReport %v\n", err)
+		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
 	}
 
-	respondSetJSON(w, http.StatusOK, report)
+	return report, http.StatusOK
 }
 
 func (s *Server) findAlliance(matchKey string, report store.ReportData) (int, store.Alliance, error) {

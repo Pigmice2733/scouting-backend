@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/store"
+	// Register mattn/go-sqlite
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const eventTableCreationQuery = `

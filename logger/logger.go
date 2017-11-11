@@ -27,17 +27,16 @@ func New(out io.Writer, settings Settings) Service {
 
 // Middleware wraps an HTTP handler to log information about
 // the request such as the method, URI, name, and time to complete
-func (s Service) Middleware(inner http.HandlerFunc, name string) http.Handler {
+func (s Service) Middleware(inner http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
 		inner.ServeHTTP(w, r)
 
 		s.Debugf(
-			"%s\t%s\t%s\t%s",
+			"%v\t%v\t%v",
 			r.Method,
 			r.RequestURI,
-			name,
 			time.Since(start),
 		)
 	})

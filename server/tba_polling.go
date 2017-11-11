@@ -19,7 +19,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 	}
 	var tbaEvents []tbaEvent
 
-	eventsEndpoint := fmt.Sprintf("%s/events/%s", tbaAPI, year)
+	eventsEndpoint := fmt.Sprintf("%s/events/%s/simple", tbaAPI, year)
 
 	req, err := http.NewRequest("GET", eventsEndpoint, nil)
 	if err != nil {
@@ -91,7 +91,7 @@ func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) (
 	}
 	var tbaMatches []tbaMatch
 
-	matchesEndpoint := fmt.Sprintf("%s/event/%s/matches", tbaAPI, eventKey)
+	matchesEndpoint := fmt.Sprintf("%s/event/%s/matches/simple", tbaAPI, eventKey)
 
 	req, err := http.NewRequest("GET", matchesEndpoint, nil)
 	if err != nil {
