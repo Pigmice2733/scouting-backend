@@ -1,8 +1,13 @@
+sudo: required
+
 language: go
 
 go:
  - 1.9
  - tip
+
+services:
+  - docker
 
 matrix:
   allow_failures:
@@ -10,8 +15,12 @@ matrix:
 
   fast_finish: true
 
-install:
- - go get -t -v ./...
+before_install:
+  - docker-compose -f compose-testing.yml build
 
 script:
- - go test -v ./...
+  - docker-compose -f compose-testing.yml up -d postgres
+  - docker-compose -f compose-testing.yml run go
+
+after_script:
+  - docker-compose -f compose-testing.yml down
