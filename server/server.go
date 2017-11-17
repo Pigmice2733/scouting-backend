@@ -51,7 +51,10 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 // Run starts a running the server on the specified address
 func (s *Server) Run(addr string) error {
 	s.logger.Infof("server up and running")
-	return http.ListenAndServe(addr, s.Router)
+	return http.ListenAndServe(addr,
+		s.logger.Middleware(
+			gziphandler.GzipHandler(
+				addDefaultHeaders(s.Router))))
 }
 
 // PollTBA polls The Blue Alliance api to populate database
@@ -62,102 +65,58 @@ func (s *Server) PollTBA(year string) error {
 func (s *Server) initializeRouter() {
 	s.Router = mux.NewRouter().StrictSlash(true)
 
-	s.Router.Handle("/events", wrapHandler(s.getEvents, s.logger, 1440)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}", wrapHandler(s.getEvent, s.logger, 1)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.getMatch, s.logger, 1)).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}", wrapHandler(s.postReport, s.logger, 1)).Methods("POST")
-	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", wrapHandler(s.updateReport, s.logger, 1)).Methods("PUT")
+	s.Router.HandleFunc("/events", s.getEvents).Methods("GET")
+	s.Router.HandleFunc("/events/{eventKey}", s.getEvent).Methods("GET")
+	s.Router.HandleFunc("/events/{eventKey}/{matchKey}", s.getMatch).Methods("GET")
+	s.Router.HandleFunc("/events/{eventKey}/{matchKey}", s.postReport).Methods("POST")
+	s.Router.HandleFunc("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.updateReport).Methods("PUT")
 
 	s.logger.Infof("initialized router...")
 }
 
-func wrapHandler(inner func(io.ReadCloser, map[string]string) (interface{}, int), logger logger.Service, cacheMinutes int) http.Handler {
-	return gziphandler.GzipHandler(logger.Middleware(requestHandler(logger, cacheMinutes, inner)))
-}
+// REST Endpoint Handlers -----------------------
 
-func generateEtag(content []byte) (string, error) {
-	hash := make([]byte, 32)
-	d := sha3.NewShake256()
-	// Write the response into the hash
-	if _, err := d.Write(content); err != nil {
-		return "", err
-	}
-	// Read 32 bytes of output from the hash into h.
-	if _, err := d.Read(hash); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hash), nil
-}
-
-func isError(statusCode int) bool {
-	// HTTP error codes are status codes 4xx-5xx
-	if statusCode >= 400 && statusCode < 600 {
-		return true
-	}
-	return false
-}
-
-func requestHandler(logger logger.Service, cacheMinutes int, inner func(io.ReadCloser, map[string]string) (interface{}, int)) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Vary", "Accept-Encoding")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-
-		vars := mux.Vars(r)
-
-		payload, status := inner(r.Body, vars)
-		ifNoneMatch := r.Header["If-None-Match"]
-
-		if isError(status) {
-			http.Error(w, payload.(string), status)
-			return
-		}
-
-		response, err := json.Marshal(payload)
-		if err != nil {
-			logger.Errorf("error: marshalling json response %v", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		contentETag, err := generateEtag(response)
-		if err != nil {
-			logger.Errorf("error: generating eTag %v", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
-		if cacheMinutes == 0 {
-			cacheControl = "no-cache"
-		}
-
-		for _, eTag := range ifNoneMatch {
-			if eTag == contentETag {
-				w.WriteHeader(http.StatusNotModified)
-				return
-			}
-		}
-		w.Header().Set("Cache-Control", cacheControl)
-		w.Header().Set("ETag", contentETag)
-		w.WriteHeader(status)
-		if _, err := w.Write(response); err != nil {
-			logger.Errorf("error: writing json []byte response %v", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-	})
-}
-
-func (s *Server) getEvents(data io.ReadCloser, vars map[string]string) (interface{}, int) {
+func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := s.store.GetEvents()
 	if err != nil {
 		s.logger.Errorf("error: getting events: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
-	return events, http.StatusOK
+
+	response, err := json.Marshal(events)
+	if err != nil {
+		s.logger.Errorf("error: marshalling json response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	normalCache(w, 1440)
+
+	foundMatchingEtag, err := addETags(w, r, response)
+	if err != nil {
+		s.logger.Errorf("error: handling eTag %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if foundMatchingEtag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(response); err != nil {
+		s.logger.Errorf("error: writing json []byte response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
-func (s *Server) getEvent(data io.ReadCloser, vars map[string]string) (interface{}, int) {
+func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
 	eventKey := vars["eventKey"]
 	e := &store.Event{
 		Key: eventKey,
@@ -165,10 +124,12 @@ func (s *Server) getEvent(data io.ReadCloser, vars map[string]string) (interface
 	err := s.store.GetEvent(e)
 	if err != nil {
 		if err == store.ErrNoResults {
-			return "non-existent event key", http.StatusNotFound
+			http.Error(w, "non-existent event key", http.StatusNotFound)
+			return
 		}
 		s.logger.Errorf("error: getting events: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	matches, err := s.pollTBAMatches("https://www.thebluealliance.com/api/v3", s.tbaAPIKey, e.Key)
@@ -178,7 +139,8 @@ func (s *Server) getEvent(data io.ReadCloser, vars map[string]string) (interface
 		matches, err = s.store.GetMatches(*e)
 		if err != nil && err != store.ErrNoResults {
 			s.logger.Errorf("error: getting events: %v\n", err)
-			return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -189,10 +151,39 @@ func (s *Server) getEvent(data io.ReadCloser, vars map[string]string) (interface
 		Matches: matches,
 	}
 
-	return fullEvent, http.StatusOK
+	response, err := json.Marshal(fullEvent)
+	if err != nil {
+		s.logger.Errorf("error: marshalling json response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	normalCache(w, 1)
+
+	foundMatchingEtag, err := addETags(w, r, response)
+	if err != nil {
+		s.logger.Errorf("error: handling eTag %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if foundMatchingEtag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(response); err != nil {
+		s.logger.Errorf("error: writing json []byte response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
-func (s *Server) getMatch(data io.ReadCloser, vars map[string]string) (interface{}, int) {
+func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
 	eventKey := vars["eventKey"]
 	matchKey := vars["matchKey"]
 	e := &store.Event{
@@ -203,10 +194,12 @@ func (s *Server) getMatch(data io.ReadCloser, vars map[string]string) (interface
 
 	if err != nil {
 		if err == store.ErrNoResults {
-			return "non-existent event key", http.StatusNotFound
+			http.Error(w, "non-existent event key", http.StatusNotFound)
+			return
 		}
 		s.logger.Errorf("error: getting match: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	partialMatch := &store.Match{
@@ -218,10 +211,12 @@ func (s *Server) getMatch(data io.ReadCloser, vars map[string]string) (interface
 	if err != nil {
 		if err == store.ErrNoResults {
 			message := fmt.Sprintf("non-existent match key '%v' under event key '%v'", matchKey, eventKey)
-			return message, http.StatusNotFound
+			http.Error(w, message, http.StatusNotFound)
+			return
 		}
 		s.logger.Errorf("error: getting match: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	blueAlliance := &store.Alliance{
@@ -236,13 +231,15 @@ func (s *Server) getMatch(data io.ReadCloser, vars map[string]string) (interface
 	_, err = s.store.GetAlliance(blueAlliance)
 	if err != nil && err != store.ErrNoResults {
 		s.logger.Errorf("error: getting alliance: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	_, err = s.store.GetAlliance(redAlliance)
 	if err != nil && err != store.ErrNoResults {
 		s.logger.Errorf("error: getting alliance: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	fullMatch := &store.FullMatch{
@@ -253,30 +250,64 @@ func (s *Server) getMatch(data io.ReadCloser, vars map[string]string) (interface
 		BlueAlliance:    *blueAlliance,
 	}
 
-	return fullMatch, http.StatusOK
+	response, err := json.Marshal(fullMatch)
+	if err != nil {
+		s.logger.Errorf("error: marshalling json response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	normalCache(w, 1)
+
+	foundMatchingEtag, err := addETags(w, r, response)
+	if err != nil {
+		s.logger.Errorf("error: handling eTag %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if foundMatchingEtag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(response); err != nil {
+		s.logger.Errorf("error: writing json []byte response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
-func (s *Server) postReport(data io.ReadCloser, vars map[string]string) (interface{}, int) {
+func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
 	matchKey := vars["matchKey"]
 
 	var report store.ReportData
+	decoder := json.NewDecoder(r.Body)
 
-	if err := json.NewDecoder(data).Decode(&report); err != nil {
-		return "invalid request payload", http.StatusBadRequest
+	if err := decoder.Decode(&report); err != nil {
+		http.Error(w, "invalid request payload", http.StatusBadRequest)
+		return
 	}
-	defer data.Close()
+
+	defer r.Body.Close()
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
 
 	if err != nil {
 		if err != store.ErrNoResults {
 			s.logger.Errorf("error: nothing present in response: %v\n", err)
-			return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
 		a.Team1 = report.Team
 		allianceID, err = s.store.CreateAlliance(a)
 		if err != nil {
-			return "no corresponding match for posted report", http.StatusBadRequest
+			http.Error(w, "no corresponding match for posted report", http.StatusBadRequest)
+			return
 		}
 	} else {
 		teamReportAlreadyExists := false
@@ -292,68 +323,112 @@ func (s *Server) postReport(data io.ReadCloser, vars map[string]string) (interfa
 			}
 			a.Team3 = report.Team
 		default:
-			return "more than three reports for a single alliance not permitted", http.StatusBadRequest
+			http.Error(w, "more than three reports for a single alliance not permitted", http.StatusBadRequest)
+			return
 		}
 
 		if teamReportAlreadyExists {
-			return "report for team already exists, use 'PUT' to update", http.StatusConflict
+			http.Error(w, "report for team already exists, use 'PUT' to update", http.StatusConflict)
+			return
 		}
 
 		err := s.store.UpdateAlliance(a)
 		if err != nil {
 			s.logger.Errorf("error: postreport: %v\n", err)
-			return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
 	}
 
 	if err := s.store.CreateReport(report, allianceID); err != nil {
 		s.logger.Errorf("error: postreport: %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
-	return report, http.StatusCreated
+	response, err := json.Marshal(report)
+	if err != nil {
+		s.logger.Errorf("error: marshalling json response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	normalCache(w, 1)
+
+	w.WriteHeader(http.StatusCreated)
+
+	if _, err := w.Write(response); err != nil {
+		s.logger.Errorf("error: writing json []byte response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
-func (s *Server) updateReport(data io.ReadCloser, vars map[string]string) (interface{}, int) {
+func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
 	matchKey := vars["matchKey"]
 	teamNumber, err := strconv.Atoi(vars["team"])
 	if err != nil {
-		return "invalid team number", http.StatusBadRequest
+		http.Error(w, "invalid team number", http.StatusBadRequest)
+		return
 	}
 
 	var report store.ReportData
-	decoder := json.NewDecoder(data)
+	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&report); err != nil {
-		return "invalid request payload", http.StatusBadRequest
+		http.Error(w, "invalid request payload", http.StatusBadRequest)
+		return
 	}
-	defer data.Close()
+
+	defer r.Body.Close()
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
 	if err != nil {
 		if err == store.ErrNoResults {
-			return "report does not exist, use 'POST' to create a report", http.StatusNotFound
+			http.Error(w, "report does not exist, use 'POST' to create a new report", http.StatusNotFound)
+			return
 		}
 		s.logger.Errorf("error: updateReport %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	teamReportExists := (a.Team1 == report.Team || a.Team2 == report.Team || a.Team3 == report.Team)
 
 	if !teamReportExists {
-		return "report does not exist, use 'POST' to create a report", http.StatusNotFound
+		http.Error(w, "report does not exist, use 'POST' to create a new report", http.StatusNotFound)
+		return
 	}
 
 	if report.Team != teamNumber {
-		return "report team does not match team specified in URI", http.StatusBadRequest
+		http.Error(w, "report team does not match team specified in URI", http.StatusBadRequest)
+		return
 	}
 
 	if err := s.store.UpdateReport(report, allianceID); err != nil {
 		s.logger.Errorf("error: updateReport %v\n", err)
-		return http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
-	return report, http.StatusOK
+	response, err := json.Marshal(report)
+	if err != nil {
+		s.logger.Errorf("error: marshalling json response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	normalCache(w, 1)
+
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(response); err != nil {
+		s.logger.Errorf("error: writing json []byte response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *Server) findAlliance(matchKey string, report store.ReportData) (int, store.Alliance, error) {
@@ -381,4 +456,68 @@ func (s *Server) createEvents(events []store.Event) error {
 		}
 	}
 	return nil
+}
+
+func normalCache(w http.ResponseWriter, cacheMinutes int) {
+	cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
+	if cacheMinutes == 0 {
+		cacheControl = "no-cache"
+	}
+
+	w.Header().Set("Cache-Control", cacheControl)
+}
+
+func noCache(w http.ResponseWriter, cacheMinutes int) {
+	w.Header().Set("Cache-Control", "no-store")
+}
+
+func addETags(w http.ResponseWriter, r *http.Request, response []byte) (bool, error) {
+	contentETag, err := generateEtag(response)
+	if err != nil {
+		return false, err
+	}
+
+	ifNoneMatch := r.Header["If-None-Match"]
+
+	for _, eTag := range ifNoneMatch {
+		if eTag == contentETag {
+			return true, nil
+		}
+	}
+
+	w.Header().Set("ETag", contentETag)
+
+	return false, nil
+}
+
+func addDefaultHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func generateEtag(content []byte) (string, error) {
+	hash := make([]byte, 32)
+	d := sha3.NewShake256()
+	// Write the response into the hash
+	if _, err := d.Write(content); err != nil {
+		return "", err
+	}
+	// Read 32 bytes of output from the hash into h.
+	if _, err := d.Read(hash); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hash), nil
+}
+
+func isError(statusCode int) bool {
+	// HTTP error codes are status codes 4xx-5xx
+	if statusCode >= 400 && statusCode < 600 {
+		return true
+	}
+	return false
 }
