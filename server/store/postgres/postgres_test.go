@@ -104,7 +104,7 @@ func ensureTableExists(creationQuery string) error {
 
 func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
-	s.Router.ServeHTTP(rr, req)
+	s.Handler.ServeHTTP(rr, req)
 
 	return rr
 }

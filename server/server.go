@@ -31,7 +31,7 @@ const (
 
 // A Server is an instance of the scouting server
 type Server struct {
-	Router    *mux.Router
+	Handler   http.Handler
 	store     store.Service
 	logger    logger.Service
 	tbaAPIKey string
@@ -75,7 +75,7 @@ func (s *Server) Run(addr string) error {
 	return http.ListenAndServe(addr,
 		s.logger.Middleware(
 			gziphandler.GzipHandler(
-				addDefaultHeaders(s.Router))))
+				addDefaultHeaders(s.Handler))))
 }
 
 // PollTBA polls The Blue Alliance api to populate database
@@ -84,14 +84,16 @@ func (s *Server) PollTBA(year string) error {
 }
 
 func (s *Server) initializeRouter() {
-	s.Router = mux.NewRouter().StrictSlash(true)
+	router := mux.NewRouter().StrictSlash(true)
 
-	s.Router.HandleFunc("/authenticate", s.authenticate).Methods("POST")
-	s.Router.HandleFunc("/events", s.getEvents).Methods("GET")
-	s.Router.HandleFunc("/events/{eventKey}", s.getEvent).Methods("GET")
-	s.Router.HandleFunc("/events/{eventKey}/{matchKey}", s.getMatch).Methods("GET")
-	s.Router.Handle("/events/{eventKey}/{matchKey}", s.authHandler(http.HandlerFunc(s.postReport))).Methods("POST")
-	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
+	router.HandleFunc("/authenticate", s.authenticate).Methods("POST")
+	router.HandleFunc("/events", s.getEvents).Methods("GET")
+	router.HandleFunc("/events/{eventKey}", s.getEvent).Methods("GET")
+	router.HandleFunc("/events/{eventKey}/{matchKey}", s.getMatch).Methods("GET")
+	router.Handle("/events/{eventKey}/{matchKey}", s.authHandler(http.HandlerFunc(s.postReport))).Methods("POST")
+	router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
+
+	s.Handler = limitHandler(router)
 
 	s.logger.Infof("initialized router...")
 }
@@ -581,6 +583,13 @@ func (s *Server) GenerateJWT(username string) (string, error) {
 	return ss, nil
 }
 
+func limitHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) authHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ss := strings.TrimPrefix(r.Header.Get("Authentication"), "Bearer ")
@@ -639,6 +648,5 @@ func isError(statusCode int) bool {
 func generateSecret(secretLength int) ([]byte, error) {
 	secret := make([]byte, 64)
 	_, err := rand.Read(secret)
-	fmt.Println(secret)
 	return secret, err
 }
