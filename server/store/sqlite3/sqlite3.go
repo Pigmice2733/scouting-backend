@@ -3,7 +3,6 @@ package sqlite3
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/server/store"
@@ -68,6 +67,14 @@ CREATE TABLE IF NOT EXISTS tbaModified
 )
 `
 
+const usersTableCreationQuery = `
+CREATE TABLE IF NOT EXISTS users
+(
+	username TEXT NOT NULL UNIQUE,
+	hashedPassword TEXT NOT NULL
+)
+`
+
 type service struct {
 	db *sql.DB
 }
@@ -80,20 +87,23 @@ func NewFromFile(dbFileName string) (store.Service, error) {
 	}
 
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	if _, err := db.Exec(eventTableCreationQuery); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if _, err := db.Exec(matchTableCreationQuery); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if _, err := db.Exec(allianceTableCreationQuery); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if _, err := db.Exec(tbaModifiedTableCreationQuery); err != nil {
-		log.Fatal(err)
+		return nil, err
+	}
+	if _, err := db.Exec(usersTableCreationQuery); err != nil {
+		return nil, err
 	}
 
 	return New(db), nil
@@ -321,6 +331,15 @@ func (s *service) MatchModifiedData(eventKey string) (string, error) {
 	}
 
 	return lastModified, nil
+}
+
+func (s *service) GetUser(username string) (store.User, error) {
+	var user store.User
+	err := s.db.QueryRow("SELECT username, hashedPassword FROM users WHERE username = $1", username).Scan(&user.Username, &user.HashedPassword)
+	if err == sql.ErrNoRows {
+		return user, store.ErrNoResults
+	}
+	return user, err
 }
 
 func (s *service) ensureTableExists(creationQuery string) error {

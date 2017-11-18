@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -11,17 +12,29 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/Pigmice2733/scouting-backend/server"
 	"github.com/Pigmice2733/scouting-backend/server/store"
 )
 
 var s *server.Server
 var rawStore *service
+var jwtSignedString string
+
+func newAuthenticatedRequest(method, urlStr string, body io.Reader) (*http.Request, error) {
+	r, err := http.NewRequest(method, urlStr, body)
+	if err != nil {
+		return nil, err
+	}
+	r.Header.Add("Authentication", "Bearer "+jwtSignedString)
+	return r, err
+}
 
 func TestMain(m *testing.M) {
 	store, err := NewFromFile("file::memory:?mode=memory&cache=shared")
 	if err != nil {
-		log.Fatalf("error creating database: %v\n", err)
+		log.Fatalf("error: creating database: %v\n", err)
 	}
 
 	var ok bool
@@ -29,7 +42,21 @@ func TestMain(m *testing.M) {
 		log.Fatalf("cannot cast store to private type for testing")
 	}
 
-	s = server.New(store, os.Stdout, "", "dev")
+	s, err = server.New(store, os.Stdout, "", "dev")
+	if err != nil {
+		log.Fatalf("error: starting server: %v\n", err)
+	}
+
+	const username = "testing"
+	const password = "password"
+
+	addUser(username, password)
+
+	jwtSignedString, err = s.GenerateJWT(username)
+	if err != nil {
+		log.Fatalf("error: generating testing user jwt token: %v\n", err)
+	}
+
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }
@@ -46,6 +73,9 @@ func setupTables() error {
 	}
 	if err := ensureTableExists(reportTableCreationQuery); err != nil {
 		return fmt.Errorf("error: ensuring report table exists: %v", err)
+	}
+	if err := ensureTableExists(usersTableCreationQuery); err != nil {
+		return fmt.Errorf("error: ensuring users table exists: %v", err)
 	}
 
 	// Order matters!
@@ -122,6 +152,16 @@ func addReports(allianceID int, team int) error {
 		return err
 	}
 	return nil
+}
+
+func addUser(username, password string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	_, err = rawStore.db.Exec("INSERT INTO users VALUES($1, $2)", username, hashedPassword)
+	return err
 }
 
 func TestEmptyEventTable(t *testing.T) {
@@ -260,7 +300,7 @@ func TestAddValidReport(t *testing.T) {
 
 	endpoint := fmt.Sprintf("/events/%s/%s", eKey, mKey)
 
-	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	req, _ := newAuthenticatedRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusCreated, response.Code)
@@ -308,7 +348,7 @@ func TestAddInvalidReport(t *testing.T) {
 
 	endpoint := fmt.Sprintf("/events/%v/%v", eKey, mKey)
 
-	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	req, _ := newAuthenticatedRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusBadRequest, response.Code)
@@ -330,7 +370,7 @@ func TestPostReportFakeMatch(t *testing.T) {
 
 	endpoint := fmt.Sprintf("/event/%v/1", eKey)
 
-	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	req, _ := newAuthenticatedRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 	checkResponseCode(t, http.StatusNotFound, response.Code)
 }
@@ -355,11 +395,11 @@ func TestPostExistingReport(t *testing.T) {
 
 	endpoint := fmt.Sprintf("/events/%v/%v", eKey, mKey)
 
-	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	req, _ := newAuthenticatedRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 	checkResponseCode(t, http.StatusCreated, response.Code)
 
-	req, _ = http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	req, _ = newAuthenticatedRequest("POST", endpoint, bytes.NewBuffer(payload))
 	response = executeRequest(req)
 	checkResponseCode(t, http.StatusConflict, response.Code)
 }
@@ -392,7 +432,7 @@ func TestUpdateReport(t *testing.T) {
 
 	endpoint := fmt.Sprintf("/events/%v/%v/2733", eKey, mKey)
 
-	req, _ := http.NewRequest("PUT", endpoint, bytes.NewBuffer(payload))
+	req, _ := newAuthenticatedRequest("PUT", endpoint, bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -430,7 +470,7 @@ func TestUpdateNonexistentReport(t *testing.T) {
 		"auto": { "crossedLine": true, "deliveredGear": true, "fuel": 10 },
 		"teleop": { "climbed": true, "gears": 3, "fuel": 10 }}`)
 
-	req, _ := http.NewRequest("PUT", "/events/Evnt1/1/2733", bytes.NewBuffer(payload))
+	req, _ := newAuthenticatedRequest("PUT", "/events/Evnt1/1/2733", bytes.NewBuffer(payload))
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusNotFound, response.Code)

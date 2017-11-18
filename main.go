@@ -32,7 +32,11 @@ func main() {
 		log.Fatalf("error creating db: %v\n", err)
 	}
 
-	server := server.New(store, os.Stdout, tbaAPIKey, environment)
+	server, err := server.New(store, os.Stdout, tbaAPIKey, environment)
+	if err != nil {
+		fmt.Printf("error starting server: %v\n", err)
+		return
+	}
 
 	if err := server.PollTBA("2017"); err != nil {
 		fmt.Printf("error polling TBA: %v\n", err)

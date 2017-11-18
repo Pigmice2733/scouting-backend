@@ -27,6 +27,7 @@ type Service interface {
 	SetEventsModifiedData(lastModified string) error
 	SetMatchModifiedData(eventKey string, lastModified string) error
 	MatchModifiedData(eventKey string) (string, error)
+	GetUser(username string) (User, error)
 }
 
 type Event struct {
@@ -83,4 +84,9 @@ type ReportData struct {
 	Score    int          `json:"score"`
 	Auto     AutoReport   `json:"auto"`
 	Teleop   TeleopReport `json:"teleop"`
+}
+
+type User struct {
+	Username       string `json:"username"`
+	HashedPassword string `json:"hashedPassword"`
 }

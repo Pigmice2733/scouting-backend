@@ -1,18 +1,32 @@
 package server
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"context"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/server/logger"
 	"github.com/Pigmice2733/scouting-backend/server/store"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/sha3"
+)
+
+type key int
+
+const (
+	keyUsernameCtx key = iota
 )
 
 // A Server is an instance of the scouting server
@@ -21,10 +35,11 @@ type Server struct {
 	store     store.Service
 	logger    logger.Service
 	tbaAPIKey string
+	jwtSecret []byte
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment string) *Server {
+func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment string) (*Server, error) {
 	s := &Server{}
 
 	s.logger = logger.New(logWriter, logger.Settings{
@@ -45,7 +60,13 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 
 	s.tbaAPIKey = tbaAPIKey
 
-	return s
+	var err error
+	s.jwtSecret, err = generateSecret(64)
+	if err != nil {
+		return s, fmt.Errorf("error: generating jwt secret: %v\n", err)
+	}
+
+	return s, nil
 }
 
 // Run starts a running the server on the specified address
@@ -65,16 +86,62 @@ func (s *Server) PollTBA(year string) error {
 func (s *Server) initializeRouter() {
 	s.Router = mux.NewRouter().StrictSlash(true)
 
+	s.Router.HandleFunc("/authenticate", s.authenticate).Methods("POST")
 	s.Router.HandleFunc("/events", s.getEvents).Methods("GET")
 	s.Router.HandleFunc("/events/{eventKey}", s.getEvent).Methods("GET")
 	s.Router.HandleFunc("/events/{eventKey}/{matchKey}", s.getMatch).Methods("GET")
-	s.Router.HandleFunc("/events/{eventKey}/{matchKey}", s.postReport).Methods("POST")
-	s.Router.HandleFunc("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.updateReport).Methods("PUT")
+	s.Router.Handle("/events/{eventKey}/{matchKey}", s.authHandler(http.HandlerFunc(s.postReport))).Methods("POST")
+	s.Router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
 
 	s.logger.Infof("initialized router...")
 }
 
 // REST Endpoint Handlers -----------------------
+
+func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) {
+	authInfo := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&authInfo); err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	user, err := s.store.GetUser(authInfo.Username)
+	if err != nil {
+		if err == store.ErrNoResults {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		} else {
+			s.logger.Errorf("error: finding user in database: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(authInfo.Password)); err != nil {
+		if err == bcrypt.ErrMismatchedHashAndPassword {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		} else {
+			s.logger.Errorf("error: comparing password hashes: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// from this point on the user has been successfully authenticated, just give them a token!
+
+	ss, err := s.GenerateJWT(user.Username)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	noCache(w, 0)
+
+	json.NewEncoder(w).Encode(map[string]string{"jwt": ss})
+}
 
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := s.store.GetEvents()
@@ -499,6 +566,53 @@ func addDefaultHeaders(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) GenerateJWT(username string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+		Subject:   username,
+		ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	ss, err := token.SignedString(s.jwtSecret)
+	if err != nil {
+		s.logger.Debugf("error: signing jwt string: %v\n", err)
+		return "", err
+	}
+
+	return ss, nil
+}
+
+func (s *Server) authHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ss := strings.TrimPrefix(r.Header.Get("Authentication"), "Bearer ")
+		token, err := jwt.Parse(ss, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+
+			return s.jwtSecret, nil
+		})
+
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+
+		var username string
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			if username, ok = claims["sub"].(string); !ok {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
+		} else {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), keyUsernameCtx, username)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func generateEtag(content []byte) (string, error) {
 	hash := make([]byte, 32)
 	d := sha3.NewShake256()
@@ -520,4 +634,11 @@ func isError(statusCode int) bool {
 		return true
 	}
 	return false
+}
+
+func generateSecret(secretLength int) ([]byte, error) {
+	secret := make([]byte, 64)
+	_, err := rand.Read(secret)
+	fmt.Println(secret)
+	return secret, err
 }

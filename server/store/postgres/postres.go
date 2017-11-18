@@ -67,6 +67,14 @@ CREATE TABLE IF NOT EXISTS tbaModified
 )
 `
 
+const usersTableCreationQuery = `
+CREATE TABLE IF NOT EXISTS users
+(
+	username TEXT NOT NULL UNIQUE,
+	hashedPassword TEXT NOT NULL
+)
+`
+
 type service struct {
 	db *sql.DB
 }
@@ -87,6 +95,23 @@ func (o Options) connectionInfo() string {
 // NewFromOptions creates a new storage service from provided connection options
 func NewFromOptions(options Options) (store.Service, error) {
 	db, err := sql.Open("postgres", options.connectionInfo())
+
+	if _, err := db.Exec(eventTableCreationQuery); err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(matchTableCreationQuery); err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(allianceTableCreationQuery); err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(tbaModifiedTableCreationQuery); err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(usersTableCreationQuery); err != nil {
+		return nil, err
+	}
+
 	return &service{db}, err
 }
 
@@ -305,6 +330,15 @@ func (s *service) MatchModifiedData(eventKey string) (string, error) {
 	}
 
 	return lastModified, nil
+}
+
+func (s *service) GetUser(username string) (store.User, error) {
+	var user store.User
+	err := s.db.QueryRow("SELECT username, hashedPassword FROM users WHERE username = $1", username).Scan(&user.Username, &user.HashedPassword)
+	if err == sql.ErrNoRows {
+		return user, store.ErrNoResults
+	}
+	return user, err
 }
 
 func (s *service) ensureTableExists(creationQuery string) error {
