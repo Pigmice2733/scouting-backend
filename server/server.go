@@ -15,6 +15,8 @@ import (
 
 	"context"
 
+	"github.com/didip/tollbooth"
+
 	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/server/logger"
 	"github.com/Pigmice2733/scouting-backend/server/store"
@@ -94,6 +96,7 @@ func (s *Server) initializeRouter() {
 	router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
 
 	s.Handler = limitHandler(router)
+	s.Handler = tollbooth.LimitHandler(tollbooth.NewLimiter(1, nil), s.Handler)
 
 	s.logger.Infof("initialized router...")
 }
