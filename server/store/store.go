@@ -33,12 +33,14 @@ type Service interface {
 	DeleteUser(username string) error
 }
 
+// Event holds data from TBA about an event
 type Event struct {
 	Key  string    `json:"key"`
 	Name string    `json:"name"`
 	Date time.Time `json:"date"`
 }
 
+// FullEvent holds an event with match data
 type FullEvent struct {
 	Key     string    `json:"key"`
 	Name    string    `json:"name"`
@@ -46,12 +48,14 @@ type FullEvent struct {
 	Matches []Match   `json:"matches"`
 }
 
+// Match holds information about a match
 type Match struct {
 	Key             string `json:"key"`
 	EventKey        string `json:"eventKey"`
 	WinningAlliance string `json:"winningAlliance"`
 }
 
+// FullMatch holds full data about a match
 type FullMatch struct {
 	Key             string   `json:"key"`
 	EventKey        string   `json:"eventKey"`
@@ -60,6 +64,7 @@ type FullMatch struct {
 	BlueAlliance    Alliance `json:"blueAlliance"`
 }
 
+// Alliance holds data on a specific alliance and its performance in a match
 type Alliance struct {
 	MatchKey string `json:"matchKey"`
 	IsBlue   bool   `json:"isBlue"`
@@ -69,18 +74,21 @@ type Alliance struct {
 	Team3    int    `json:"team3"`
 }
 
+// AutoReport holds information about the autonomous performance in a match
 type AutoReport struct {
 	CrossedLine   bool `json:"crossedLine"`
 	DeliveredGear bool `json:"deliveredGear"`
 	Fuel          int  `json:"fuel"`
 }
 
+// TeleopReport holds information about the teleoperated performance in a match
 type TeleopReport struct {
 	Climbed bool `json:"climbed"`
 	Gears   int  `json:"gears"`
 	Fuel    int  `json:"fuel"`
 }
 
+// ReportData holds information about a team and their the performance in a match
 type ReportData struct {
 	Alliance string       `json:"alliance"`
 	Team     int          `json:"team"`
@@ -89,6 +97,7 @@ type ReportData struct {
 	Teleop   TeleopReport `json:"teleop"`
 }
 
+// User holds information about a user
 type User struct {
 	Username       string `json:"username"`
 	HashedPassword string `json:"hashedPassword"`
