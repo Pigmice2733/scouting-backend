@@ -341,6 +341,41 @@ func (s *service) GetUser(username string) (store.User, error) {
 	return user, err
 }
 
+func (s *service) GetUsers() ([]store.User, error) {
+	var users []store.User
+
+	rows, err := s.db.Query("SELECT username, hashedPassword FROM users")
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return users, store.ErrNoResults
+		}
+		return users, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user store.User
+		if err := rows.Scan(&user.Username, &user.HashedPassword); err != nil {
+			return users, err
+		}
+		users = append(users, user)
+	}
+
+	err = rows.Err()
+
+	return users, err
+}
+
+func (s *service) CreateUser(user store.User) error {
+	_, err := s.db.Exec("INSERT INTO users VALUES ($1, $2)", user.Username, user.HashedPassword)
+	return err
+}
+
+func (s *service) DeleteUser(username string) error {
+	_, err := s.db.Exec("DELETE FROM users WHERE username = $1", username)
+	return err
+}
+
 func (s *service) ensureTableExists(creationQuery string) error {
 	_, err := s.db.Exec(creationQuery)
 	return err

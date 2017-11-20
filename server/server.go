@@ -89,6 +89,10 @@ func (s *Server) initializeRouter() {
 	router := mux.NewRouter().StrictSlash(true)
 
 	router.HandleFunc("/authenticate", s.authenticate).Methods("POST")
+	router.Handle("/users", s.authHandler(http.HandlerFunc(s.getUsers))).Methods("GET")
+	router.Handle("/users", s.authHandler(http.HandlerFunc(s.createUser))).Methods("POST")
+	router.Handle("/users/{username}", s.authHandler(http.HandlerFunc(s.getUser))).Methods("GET")
+	router.Handle("/users/{username}", s.authHandler(http.HandlerFunc(s.deleteUser))).Methods("DELETE")
 	router.HandleFunc("/events", s.getEvents).Methods("GET")
 	router.HandleFunc("/events/{eventKey}", s.getEvent).Methods("GET")
 	router.HandleFunc("/events/{eventKey}/{matchKey}", s.getMatch).Methods("GET")
@@ -146,6 +150,101 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) {
 	noCache(w, 0)
 
 	json.NewEncoder(w).Encode(map[string]string{"jwt": ss})
+}
+
+func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	username := vars["username"]
+
+	user, err := s.store.GetUser(username)
+	if err != nil {
+		if err == store.ErrNoResults {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		} else {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	normalCache(w, 1440)
+
+	json.NewEncoder(w).Encode(user)
+}
+
+func (s *Server) getUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := s.store.GetUsers()
+	if err != nil && err != store.ErrNoResults {
+		s.logger.Errorf("error: getting users: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	response, err := json.Marshal(users)
+	if err != nil {
+		s.logger.Errorf("error: marshalling json response %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	normalCache(w, 1440)
+
+	foundMatchingEtag, err := addETags(w, r, response)
+	if err != nil {
+		s.logger.Errorf("error: handling eTag %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if foundMatchingEtag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	if _, err := w.Write(response); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
+	authInfo := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&authInfo); err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(authInfo.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	user := store.User{Username: authInfo.Username, HashedPassword: string(hashedPassword)}
+	if err := s.store.CreateUser(user); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	noCache(w, 0)
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) deleteUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	username := vars["username"]
+
+	if err := s.store.DeleteUser(username); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	noCache(w, 0)
 }
 
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {

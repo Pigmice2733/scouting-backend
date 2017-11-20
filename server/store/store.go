@@ -28,6 +28,9 @@ type Service interface {
 	SetMatchModifiedData(eventKey string, lastModified string) error
 	MatchModifiedData(eventKey string) (string, error)
 	GetUser(username string) (User, error)
+	GetUsers() ([]User, error)
+	CreateUser(User) error
+	DeleteUser(username string) error
 }
 
 type Event struct {
