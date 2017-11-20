@@ -9,6 +9,36 @@
 			"revisionTime": "2017-11-09T10:59:03Z"
 		},
 		{
+			"checksumSHA1": "0sh4FXicINLD/q5WM0qnXLan21g=",
+			"path": "github.com/dgrijalva/jwt-go",
+			"revision": "dbeaa9332f19a944acb5736b4456cfcc02140e29",
+			"revisionTime": "2017-10-19T21:57:19Z"
+		},
+		{
+			"checksumSHA1": "UptcFu62IFoR+6IDUUmBugjBpCE=",
+			"path": "github.com/didip/tollbooth",
+			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
+			"revisionTime": "2017-11-18T22:44:42Z"
+		},
+		{
+			"checksumSHA1": "/MkoFe4J3RLhThVEDsd1qdJYEPo=",
+			"path": "github.com/didip/tollbooth/errors",
+			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
+			"revisionTime": "2017-11-18T22:44:42Z"
+		},
+		{
+			"checksumSHA1": "KcyJkQS3ZUisCoWBalbyX+9voDs=",
+			"path": "github.com/didip/tollbooth/libstring",
+			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
+			"revisionTime": "2017-11-18T22:44:42Z"
+		},
+		{
+			"checksumSHA1": "iJMSIis5g7/YWLYorIHNi55WW+s=",
+			"path": "github.com/didip/tollbooth/limiter",
+			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
+			"revisionTime": "2017-11-18T22:44:42Z"
+		},
+		{
 			"checksumSHA1": "IkPM2QLv9urri7S49wzroQx9oXA=",
 			"path": "github.com/gorilla/context",
 			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
@@ -39,6 +69,25 @@
 			"revisionTime": "2017-10-24T02:57:10Z"
 		},
 		{
+			"checksumSHA1": "B4MQSFtn9ip7g7pwzp4w5nAK+IE=",
+			"origin": "github.com/didip/tollbooth/vendor/github.com/patrickmn/go-cache",
+			"path": "github.com/patrickmn/go-cache",
+			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
+			"revisionTime": "2017-11-18T22:44:42Z"
+		},
+		{
+			"checksumSHA1": "UWjVYmoHlIfHzVIskELHiJQtMOI=",
+			"path": "golang.org/x/crypto/bcrypt",
+			"revision": "6a293f2d4b14b8e6d3f0539e383f6d0d30fce3fd",
+			"revisionTime": "2017-09-25T11:22:06Z"
+		},
+		{
+			"checksumSHA1": "oVPHWesOmZ02vLq2fglGvf+AMgk=",
+			"path": "golang.org/x/crypto/blowfish",
+			"revision": "6a293f2d4b14b8e6d3f0539e383f6d0d30fce3fd",
+			"revisionTime": "2017-09-25T11:22:06Z"
+		},
+		{
 			"checksumSHA1": "iNE2KX9BQzCptlQC2DdQEVmn4R4=",
 			"path": "golang.org/x/crypto/sha3",
 			"revision": "6a293f2d4b14b8e6d3f0539e383f6d0d30fce3fd",
@@ -49,6 +98,13 @@
 			"path": "golang.org/x/net/context",
 			"revision": "a337091b0525af65de94df2eb7e98bd9962dcbe2",
 			"revisionTime": "2016-10-09T20:39:03Z"
+		},
+		{
+			"checksumSHA1": "3kFlcvxULPbrcBKNLzy/lD4qSKI=",
+			"origin": "github.com/didip/tollbooth/vendor/golang.org/x/time/rate",
+			"path": "golang.org/x/time/rate",
+			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
+			"revisionTime": "2017-11-18T22:44:42Z"
 		}
 	],
 	"rootPath": "github.com/Pigmice2733/scouting-backend"
