@@ -177,8 +177,6 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-
 	if _, err := w.Write(response); err != nil {
 		s.logger.Errorf("error: writing json []byte response %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -243,8 +241,6 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(response); err != nil {
 		s.logger.Errorf("error: writing json []byte response %v", err)
@@ -342,8 +338,6 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(response); err != nil {
 		s.logger.Errorf("error: writing json []byte response %v", err)
@@ -493,8 +487,6 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	normalCache(w, 1)
-
-	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(response); err != nil {
 		s.logger.Errorf("error: writing json []byte response %v", err)
