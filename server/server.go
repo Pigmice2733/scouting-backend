@@ -249,7 +249,7 @@ func (s *Server) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := s.store.GetEvents()
-	if err != nil {
+	if err != nil && err != store.ErrNoResults {
 		s.logger.Errorf("error: getting events: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -277,8 +277,7 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := w.Write(response); err != nil {
-		s.logger.Errorf("error: writing json []byte response %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 }
@@ -294,10 +293,10 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == store.ErrNoResults {
 			http.Error(w, "non-existent event key", http.StatusNotFound)
-			return
+		} else {
+			s.logger.Errorf("error: getting events: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
-		s.logger.Errorf("error: getting events: %v\n", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -342,8 +341,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := w.Write(response); err != nil {
-		s.logger.Errorf("error: writing json []byte response %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 }
@@ -362,10 +360,11 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == store.ErrNoResults {
 			http.Error(w, "non-existent event key", http.StatusNotFound)
-			return
+		} else {
+
+			s.logger.Errorf("error: getting match: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
-		s.logger.Errorf("error: getting match: %v\n", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -379,10 +378,10 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 		if err == store.ErrNoResults {
 			message := fmt.Sprintf("non-existent match key '%v' under event key '%v'", matchKey, eventKey)
 			http.Error(w, message, http.StatusNotFound)
-			return
+		} else {
+			s.logger.Errorf("error: getting match: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
-		s.logger.Errorf("error: getting match: %v\n", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -439,8 +438,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := w.Write(response); err != nil {
-		s.logger.Errorf("error: writing json []byte response %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 }
@@ -499,14 +497,12 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 
 		err := s.store.UpdateAlliance(a)
 		if err != nil {
-			s.logger.Errorf("error: postreport: %v\n", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if err := s.store.CreateReport(report, allianceID); err != nil {
-		s.logger.Errorf("error: postreport: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -523,8 +519,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if _, err := w.Write(response); err != nil {
-		s.logger.Errorf("error: writing json []byte response %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 }
@@ -573,7 +568,6 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.store.UpdateReport(report, allianceID); err != nil {
-		s.logger.Errorf("error: updateReport %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -588,8 +582,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	normalCache(w, 1)
 
 	if _, err := w.Write(response); err != nil {
-		s.logger.Errorf("error: writing json []byte response %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 }
@@ -670,7 +663,7 @@ func (s *Server) GenerateJWT(username string) (string, error) {
 
 	ss, err := token.SignedString(s.jwtSecret)
 	if err != nil {
-		s.logger.Debugf("error: signing jwt string: %v\n", err)
+		s.logger.Errorf("error: signing jwt string: %v\n", err)
 		return "", err
 	}
 
