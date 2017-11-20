@@ -15,12 +15,11 @@ import (
 
 	"context"
 
-	"github.com/didip/tollbooth"
-
 	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/server/logger"
 	"github.com/Pigmice2733/scouting-backend/server/store"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/didip/tollbooth"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/sha3"
 )
@@ -53,6 +52,7 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 	s.store = store
 
 	s.initializeRouter()
+	s.initializeMiddlewares()
 
 	s.logger = logger.New(logWriter, logger.Settings{
 		Debug: environment == "dev",
@@ -74,10 +74,7 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 // Run starts a running the server on the specified address
 func (s *Server) Run(addr string) error {
 	s.logger.Infof("server up and running")
-	return http.ListenAndServe(addr,
-		s.logger.Middleware(
-			gziphandler.GzipHandler(
-				addDefaultHeaders(s.Handler))))
+	return http.ListenAndServe(addr, s.Handler)
 }
 
 // PollTBA polls The Blue Alliance api to populate database
@@ -99,10 +96,17 @@ func (s *Server) initializeRouter() {
 	router.Handle("/events/{eventKey}/{matchKey}", s.authHandler(http.HandlerFunc(s.postReport))).Methods("POST")
 	router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
 
-	s.Handler = limitHandler(router)
-	s.Handler = tollbooth.LimitHandler(tollbooth.NewLimiter(1, nil), s.Handler)
+	s.Handler = router
 
 	s.logger.Infof("initialized router...")
+}
+
+func (s *Server) initializeMiddlewares() {
+	s.Handler = tollbooth.LimitHandler(tollbooth.NewLimiter(1, nil),
+		(limitHandler(
+			s.logger.Middleware(
+				gziphandler.GzipHandler(
+					addDefaultHeaders(s.Handler))))))
 }
 
 // REST Endpoint Handlers -----------------------
