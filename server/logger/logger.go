@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+const (
+	infoPrefix  = "[INFO]"
+	debugPrefix = "[DEBUG]"
+	errorPrefix = "[ERROR]"
+)
+
 // Service is provided for writing log messages to an io.Writer interface
 type Service struct {
 	logger   *log.Logger
@@ -34,7 +40,7 @@ func (s Service) Middleware(inner http.Handler) http.Handler {
 		inner.ServeHTTP(w, r)
 
 		s.Debugf(
-			"%v\t%v\t%v",
+			"%s\t%s\t%d",
 			r.Method,
 			r.RequestURI,
 			time.Since(start),
@@ -46,7 +52,7 @@ func (s Service) Middleware(inner http.Handler) http.Handler {
 // prefix '[INFO]'
 func (s Service) Infof(format string, a ...interface{}) {
 	if s.settings.Info {
-		s.logger.Printf("[INFO] "+format, a...)
+		s.logger.Printf(infoPrefix+" "+format, a...)
 	}
 }
 
@@ -54,7 +60,7 @@ func (s Service) Infof(format string, a ...interface{}) {
 // prefix '[DEBUG]'
 func (s Service) Debugf(format string, a ...interface{}) {
 	if s.settings.Debug {
-		s.logger.Printf("[DEBUG] "+format, a...)
+		s.logger.Printf(debugPrefix+" "+format, a...)
 	}
 }
 
@@ -62,6 +68,6 @@ func (s Service) Debugf(format string, a ...interface{}) {
 // prefix '[ERROR]'
 func (s Service) Errorf(format string, a ...interface{}) {
 	if s.settings.Error {
-		s.logger.Printf("[ERROR] "+format, a...)
+		s.logger.Printf(errorPrefix+" "+format, a...)
 	}
 }
