@@ -3,7 +3,6 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/Pigmice2733/scouting-backend/server/store"
 	// Register postgres driver
@@ -15,7 +14,7 @@ CREATE TABLE IF NOT EXISTS events
 (
 	key  TEXT PRIMARY KEY,
 	name TEXT NOT NULL,
-	date TEXT NOT NULL
+	date TIMESTAMP NOT NULL
 )`
 
 const matchTableCreationQuery = `
@@ -51,7 +50,7 @@ CREATE TABLE IF NOT EXISTS reports
     crossedLine   BOOLEAN,
     deliveredGear BOOLEAN,
     autoFuel      INT,
-  	climbed       BOOLEAN,
+    climbed       BOOLEAN,
     gears         INT,
     teleopFuel    INT,
     FOREIGN KEY(allianceID) REFERENCES alliances(id)
@@ -105,6 +104,9 @@ func NewFromOptions(options Options) (store.Service, error) {
 	if _, err := db.Exec(allianceTableCreationQuery); err != nil {
 		return nil, err
 	}
+	if _, err := db.Exec(reportTableCreationQuery); err != nil {
+		return nil, err
+	}
 	if _, err := db.Exec(tbaModifiedTableCreationQuery); err != nil {
 		return nil, err
 	}
@@ -136,15 +138,9 @@ func (s *service) GetEvents() ([]store.Event, error) {
 
 	for rows.Next() {
 		var e store.Event
-		var dateString string
-		if err := rows.Scan(&e.Key, &e.Name, &dateString); err != nil {
+		if err := rows.Scan(&e.Key, &e.Name, &e.Date); err != nil {
 			return nil, err
 		}
-		date, err := time.Parse(time.RFC3339, dateString)
-		if err != nil {
-			return nil, err
-		}
-		e.Date = date
 		events = append(events, e)
 	}
 
@@ -154,27 +150,20 @@ func (s *service) GetEvents() ([]store.Event, error) {
 func (s *service) GetEvent(key string) (store.Event, error) {
 	row := s.db.QueryRow("SELECT name, date FROM events WHERE key=$1", key)
 
-	var dateString string
 	e := store.Event{Key: key}
 
-	if err := row.Scan(&e.Name, &dateString); err != nil {
+	if err := row.Scan(&e.Name, &e.Date); err != nil {
 		if err == sql.ErrNoRows {
 			return e, store.ErrNoResults
 		}
 		return e, err
 	}
 
-	date, err := time.Parse(time.RFC3339, dateString)
-	if err != nil {
-		return e, err
-	}
-	e.Date = date
-
 	return e, nil
 }
 
 func (s *service) CreateEvent(e store.Event) error {
-	_, err := s.db.Exec("INSERT OR IGNORE INTO events(key, name, date) VALUES($1, $2, $3)", e.Key, e.Name, e.Date.Format(time.RFC3339))
+	_, err := s.db.Exec("INSERT INTO events(key, name, date) VALUES($1, $2, $3)", e.Key, e.Name, e.Date)
 	return err
 }
 
@@ -232,12 +221,12 @@ func (s *service) GetMatches(key string) ([]store.Match, error) {
 }
 
 func (s *service) CreateMatch(m store.Match) error {
-	_, err := s.db.Exec("INSERT OR IGNORE INTO matches(key, eventKey, winningAlliance) VALUES($1, $2, $3)", m.Key, m.EventKey, m.WinningAlliance)
+	_, err := s.db.Exec("INSERT INTO matches(key, eventKey, winningAlliance) VALUES($1, $2, $3)", m.Key, m.EventKey, m.WinningAlliance)
 	return err
 }
 
 func (s *service) GetAlliance(matchKey string, isBlue bool) (store.Alliance, int, error) {
-	row := s.db.QueryRow("SELECT id, score, team1, team2, team2 FROM alliances WHERE matchKey=$1 AND isBlue=$2", matchKey, isBlue)
+	row := s.db.QueryRow("SELECT id, score, team1, team2, team3 FROM alliances WHERE matchKey=$1 AND isBlue=$2", matchKey, isBlue)
 
 	var allianceID int
 	a := store.Alliance{MatchKey: matchKey, IsBlue: isBlue}
@@ -252,7 +241,7 @@ func (s *service) GetAlliance(matchKey string, isBlue bool) (store.Alliance, int
 }
 
 func (s *service) UpdateAlliance(a store.Alliance) error {
-	_, err := s.db.Exec("UPDATE alliances SET team1=$1, team2=$2, team3=$3 WHERE matchKey=$4 AND isBlue=$5", a.Team1, a.Team2, a.Team3, a.MatchKey, a.IsBlue)
+	_, err := s.db.Exec("UPDATE alliances SET score = $1, team1=$2, team2=$3, team3=$4 WHERE matchKey=$5 AND isBlue=$6", a.Score, a.Team1, a.Team2, a.Team3, a.MatchKey, a.IsBlue)
 	return err
 }
 
