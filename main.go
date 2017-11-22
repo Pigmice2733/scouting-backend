@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/Pigmice2733/scouting-backend/server"
-	"github.com/Pigmice2733/scouting-backend/server/store/sqlite3"
+	"github.com/Pigmice2733/scouting-backend/server/store/postgres"
 )
 
 func main() {
@@ -27,9 +27,9 @@ func main() {
 		environment = "dev"
 	}
 
-	store, err := sqlite3.NewFromFile("scouting.db")
+	store, err := postgres.NewFromOptions(postgres.Options{User: os.Getenv("POSTGRES_1_ENV_POSTGRES_USER"), Pass: os.Getenv("POSTGRES_1_ENV_POSTGRES_PASSWORD"), Host: os.Getenv("POSTGRES_1_PORT_5432_TCP_ADDR"), Port: 5432, DBName: os.Getenv("POSTGRES_1_ENV_POSTGRES_DB"), SSLMode: "disable"})
 	if err != nil {
-		log.Fatalf("error creating db: %v\n", err)
+		log.Fatalf("error: creating database: %v\n", err)
 	}
 
 	server, err := server.New(store, os.Stdout, tbaAPIKey, environment)

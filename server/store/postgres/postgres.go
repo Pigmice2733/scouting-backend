@@ -1,4 +1,4 @@
-package sqlite3
+package postgres
 
 import (
 	"database/sql"
@@ -151,25 +151,26 @@ func (s *service) GetEvents() ([]store.Event, error) {
 	return events, nil
 }
 
-func (s *service) GetEvent(e *store.Event) error {
-	row := s.db.QueryRow("SELECT name, date FROM events WHERE key=$1", e.Key)
+func (s *service) GetEvent(key string) (store.Event, error) {
+	row := s.db.QueryRow("SELECT name, date FROM events WHERE key=$1", key)
 
 	var dateString string
+	e := store.Event{Key: key}
 
 	if err := row.Scan(&e.Name, &dateString); err != nil {
 		if err == sql.ErrNoRows {
-			return store.ErrNoResults
+			return e, store.ErrNoResults
 		}
-		return err
+		return e, err
 	}
 
 	date, err := time.Parse(time.RFC3339, dateString)
 	if err != nil {
-		return err
+		return e, err
 	}
 	e.Date = date
 
-	return nil
+	return e, nil
 }
 
 func (s *service) CreateEvent(e store.Event) error {
@@ -177,27 +178,30 @@ func (s *service) CreateEvent(e store.Event) error {
 	return err
 }
 
-func (s *service) GetMatch(m *store.Match) error {
-	row := s.db.QueryRow("SELECT winningAlliance FROM matches WHERE eventKey=$1 AND key=$2", m.EventKey, m.Key)
+func (s *service) GetMatch(eventKey, key string) (store.Match, error) {
+	row := s.db.QueryRow("SELECT winningAlliance FROM matches WHERE eventKey=$1 AND key=$2", eventKey, key)
 
 	var winningAlliance sql.NullString
+	e := store.Match{EventKey: eventKey, Key: key}
+
 	if err := row.Scan(&winningAlliance); err != nil {
 		if err == sql.ErrNoRows {
-			return store.ErrNoResults
+			return e, store.ErrNoResults
 		}
-		return err
+		return e, err
 	}
 
 	if !winningAlliance.Valid {
-		m.WinningAlliance = ""
+		e.WinningAlliance = ""
 	} else {
-		m.WinningAlliance = winningAlliance.String
+		e.WinningAlliance = winningAlliance.String
 	}
-	return nil
+
+	return e, nil
 }
 
-func (s *service) GetMatches(e store.Event) ([]store.Match, error) {
-	rows, err := s.db.Query("SELECT key, eventKey, winningAlliance FROM matches WHERE eventKey=$1", e.Key)
+func (s *service) GetMatches(key string) ([]store.Match, error) {
+	rows, err := s.db.Query("SELECT key, eventKey, winningAlliance FROM matches WHERE eventKey=$1", key)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -232,17 +236,19 @@ func (s *service) CreateMatch(m store.Match) error {
 	return err
 }
 
-func (s *service) GetAlliance(a *store.Alliance) (int, error) {
-	row := s.db.QueryRow("SELECT id, score, team1, team2, team2 FROM alliances WHERE matchKey=$1 AND isBlue=$2", a.MatchKey, a.IsBlue)
+func (s *service) GetAlliance(matchKey string, isBlue bool) (store.Alliance, int, error) {
+	row := s.db.QueryRow("SELECT id, score, team1, team2, team2 FROM alliances WHERE matchKey=$1 AND isBlue=$2", matchKey, isBlue)
 
 	var allianceID int
+	a := store.Alliance{MatchKey: matchKey, IsBlue: isBlue}
+
 	err := row.Scan(&allianceID, &a.Score, &a.Team1, &a.Team2, &a.Team3)
 
 	if err == sql.ErrNoRows {
-		return allianceID, store.ErrNoResults
+		return a, allianceID, store.ErrNoResults
 	}
 
-	return allianceID, err
+	return a, allianceID, err
 }
 
 func (s *service) UpdateAlliance(a store.Alliance) error {

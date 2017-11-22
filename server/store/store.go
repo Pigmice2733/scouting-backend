@@ -11,12 +11,12 @@ var ErrNoResults = fmt.Errorf("no results returned")
 // Service is a storage interface for event, match, alliance, and report CRUD
 type Service interface {
 	GetEvents() ([]Event, error)
-	GetEvent(e *Event) error
+	GetEvent(key string) (Event, error)
 	CreateEvent(e Event) error
-	GetMatches(e Event) ([]Match, error)
-	GetMatch(m *Match) error
+	GetMatches(key string) ([]Match, error)
+	GetMatch(eventKey, key string) (Match, error)
 	CreateMatch(m Match) error
-	GetAlliance(a *Alliance) (int, error)
+	GetAlliance(matchKey string, isBlue bool) (Alliance, int, error)
 	UpdateAlliance(a Alliance) error
 	CreateAlliance(a Alliance) (int, error)
 	CreateReport(rd ReportData, allianceID int) error

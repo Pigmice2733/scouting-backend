@@ -290,10 +290,8 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	eventKey := vars["eventKey"]
-	e := &store.Event{
-		Key: eventKey,
-	}
-	err := s.store.GetEvent(e)
+
+	e, err := s.store.GetEvent(eventKey)
 	if err != nil {
 		if err == store.ErrNoResults {
 			http.Error(w, "non-existent event key", http.StatusNotFound)
@@ -308,7 +306,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Infof(err.Error())
 
-		matches, err = s.store.GetMatches(*e)
+		matches, err = s.store.GetMatches(e.Key)
 		if err != nil && err != store.ErrNoResults {
 			s.logger.Errorf("error: getting events: %v\n", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -316,7 +314,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fullEvent := &store.FullEvent{
+	fullEvent := store.FullEvent{
 		Key:     e.Key,
 		Name:    e.Name,
 		Date:    e.Date,
@@ -355,28 +353,8 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	eventKey := vars["eventKey"]
 	matchKey := vars["matchKey"]
-	e := &store.Event{
-		Key: eventKey,
-	}
 
-	err := s.store.GetEvent(e)
-
-	if err != nil {
-		if err == store.ErrNoResults {
-			http.Error(w, "non-existent event key", http.StatusNotFound)
-		} else {
-
-			s.logger.Errorf("error: getting match: %v\n", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-		return
-	}
-
-	partialMatch := &store.Match{
-		Key:      matchKey,
-		EventKey: eventKey,
-	}
-	err = s.store.GetMatch(partialMatch)
+	match, err := s.store.GetMatch(eventKey, matchKey)
 
 	if err != nil {
 		if err == store.ErrNoResults {
@@ -389,23 +367,14 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	blueAlliance := &store.Alliance{
-		MatchKey: matchKey,
-		IsBlue:   true,
-	}
-	redAlliance := &store.Alliance{
-		MatchKey: matchKey,
-		IsBlue:   false,
-	}
-
-	_, err = s.store.GetAlliance(blueAlliance)
+	blueAlliance, _, err := s.store.GetAlliance(matchKey, true)
 	if err != nil && err != store.ErrNoResults {
 		s.logger.Errorf("error: getting alliance: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = s.store.GetAlliance(redAlliance)
+	redAlliance, _, err := s.store.GetAlliance(matchKey, false)
 	if err != nil && err != store.ErrNoResults {
 		s.logger.Errorf("error: getting alliance: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -413,11 +382,11 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fullMatch := &store.FullMatch{
-		Key:             partialMatch.Key,
-		EventKey:        partialMatch.EventKey,
-		WinningAlliance: partialMatch.WinningAlliance,
-		RedAlliance:     *redAlliance,
-		BlueAlliance:    *blueAlliance,
+		Key:             match.Key,
+		EventKey:        match.EventKey,
+		WinningAlliance: match.WinningAlliance,
+		RedAlliance:     redAlliance,
+		BlueAlliance:    blueAlliance,
 	}
 
 	response, err := json.Marshal(fullMatch)
@@ -597,14 +566,10 @@ func (s *Server) findAlliance(matchKey string, report store.ReportData) (int, st
 		isBlue = false
 	}
 
-	a := &store.Alliance{
-		MatchKey: matchKey,
-		IsBlue:   isBlue,
-		Score:    report.Score,
-	}
+	a, id, err := s.store.GetAlliance(matchKey, isBlue)
+	a.Score = report.Score
 
-	id, err := s.store.GetAlliance(a)
-	return id, *a, err
+	return id, a, err
 }
 
 func (s *Server) createEvents(events []store.Event) error {
