@@ -15,13 +15,5 @@ matrix:
 
   fast_finish: true
 
-before_install:
-  - docker-compose -f compose-testing.yml build
-
 script:
-  - docker-compose -f compose-testing.yml up -d postgres
-  - sleep 2
-  - docker-compose -f compose-testing.yml run go
-
-after_script:
-  - docker-compose -f compose-testing.yml down
+  - sh ./test.sh
