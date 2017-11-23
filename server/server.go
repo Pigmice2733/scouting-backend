@@ -427,13 +427,18 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	eventKey := vars["eventKey"]
 
 	var report store.ReportData
-	decoder := json.NewDecoder(r.Body)
 
-	if err := decoder.Decode(&report); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
 		http.Error(w, "invalid request payload", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
+
+	if reporter, ok := r.Context().Value(keyUsernameCtx).(string); ok {
+		report.Reporter = reporter
+	} else {
+		report.Reporter = ""
+	}
 
 	matchExists, err := s.store.CheckMatchExistence(eventKey, matchKey)
 	if err != nil {
@@ -480,7 +485,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-        a.Score = report.Score
+		a.Score = report.Score
 		err = s.store.UpdateAlliance(a)
 		if err != nil {
 			http.Error(w, "failed to update alliance data", http.StatusBadRequest)
@@ -498,10 +503,9 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-
 	if err := s.store.CreateReport(report, a.ID); err != nil {
 		s.logger.Errorf("error: postreport: %v\n", err)
-	  http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -529,14 +533,18 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	teamNumber := vars["team"]
 
 	var report store.ReportData
-	decoder := json.NewDecoder(r.Body)
 
-	if err := decoder.Decode(&report); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
 		http.Error(w, "invalid request payload", http.StatusBadRequest)
 		return
 	}
-
 	defer r.Body.Close()
+
+	if reporter, ok := r.Context().Value(keyUsernameCtx).(string); ok {
+		report.Reporter = reporter
+	} else {
+		report.Reporter = ""
+	}
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
 	if err != nil {

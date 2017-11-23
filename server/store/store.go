@@ -19,7 +19,7 @@ type Service interface {
 	GetMatch(eventKey, key string) (Match, error)
 	CreateMatch(m Match) error
 	GetAlliance(matchKey string, isBlue bool) (Alliance, int, error)
-    UpdateAlliance(a Alliance) error
+	UpdateAlliance(a Alliance) error
 	CreateAlliance(a Alliance) (allianceID int, err error)
 	CreateReport(rd ReportData, allianceID int) error
 	UpdateReport(rd ReportData, allianceID int) error
@@ -95,6 +95,7 @@ type TeleopReport struct {
 
 // ReportData holds information about a team and their the performance in a specific match
 type ReportData struct {
+	Reporter string       `json:"reporter"`
 	Alliance string       `json:"alliance"`
 	Team     string       `json:"team"`
 	Score    int          `json:"score"`

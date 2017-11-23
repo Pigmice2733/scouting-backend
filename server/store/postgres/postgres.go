@@ -1,10 +1,11 @@
 package postgres
 
 import (
-	"time"
-	"github.com/lib/pq"
 	"database/sql"
 	"fmt"
+	"time"
+
+	"github.com/lib/pq"
 
 	"github.com/Pigmice2733/scouting-backend/server/store"
 	// Register postgres driver
@@ -15,15 +16,15 @@ const eventTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS events
 (
 	key  TEXT PRIMARY KEY,
-	name TEXT NOT NULL,
-	date TIMESTAMPTZ NOT NULL
+	name TEXT              NOT NULL,
+	date TIMESTAMPTZ       NOT NULL
 )`
 
 const matchTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS matches
 (
 	key                   TEXT PRIMARY KEY,
-	eventKey              TEXT NOT NULL,
+	eventKey              TEXT              NOT NULL,
 	predictedTime         TIMESTAMPTZ,
 	actualTime            TIMESTAMPTZ,
 	winningAlliance       TEXT,
@@ -34,9 +35,9 @@ const allianceTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS alliances
 (
 	id       SERIAL PRIMARY KEY NOT NULL,
-	matchKey TEXT    NOT NULL,
-	isBlue   BOOLEAN NOT NULL,
-	score    INT     NOT NULL,
+	matchKey TEXT               NOT NULL,
+	isBlue   BOOLEAN            NOT NULL,
+	score    INT                NOT NULL,
 	FOREIGN KEY(matchKey) REFERENCES matches(key),
 	UNIQUE (matchKey, isBlue)
 )
@@ -46,8 +47,8 @@ CREATE TABLE IF NOT EXISTS alliances
 const teamInAllianceTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS teamsInAlliance
 (
-	number                TEXT NOT NULL,
-	allianceID            INT NOT NULL,
+	number                TEXT  NOT NULL,
+	allianceID            INT   NOT NULL,
 	predictedContribution TEXT,
 	actualContribution    TEXT,
 	FOREIGN KEY(allianceID) REFERENCES alliances(id),
@@ -59,9 +60,10 @@ const reportTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS reports
 (
     id            SERIAL PRIMARY KEY NOT NULL,
-    allianceID    INT     NOT NULL,
-    teamNumber    TEXT    NOT NULL,
-    score         INT     NOT NULL,
+    reporter      TEXT               NOT NULL,
+    allianceID    INT                NOT NULL,
+    teamNumber    TEXT               NOT NULL,
+    score         INT                NOT NULL,
     crossedLine   BOOLEAN,
     deliveredGear BOOLEAN,
     autoFuel      INT,
@@ -218,7 +220,7 @@ func (s *service) CreateMatch(m store.Match) error {
 func (s *service) GetMatch(eventKey, key string) (store.Match, error) {
 	row := s.db.QueryRow("SELECT predictedTime, actualTime, winningAlliance FROM matches WHERE eventKey=$1 AND key=$2", eventKey, key)
 
-	m := store.Match {Key: key, EventKey: eventKey}
+	m := store.Match{Key: key, EventKey: eventKey}
 
 	var winningAlliance sql.NullString
 	// Golang database/sql doesn't have a NullTime type 🙄
@@ -277,7 +279,8 @@ func (s *service) GetAllMatchData(eventKey string) ([]store.Match, error) {
 		if !predictedTime.Valid {
 			m.PredictedTime = time.Time{}
 		} else {
-			m.PredictedTime = predictedTime.Time.UTC()		}
+			m.PredictedTime = predictedTime.Time.UTC()
+		}
 
 		if !actualTime.Valid {
 			m.ActualTime = time.Time{}
@@ -300,7 +303,7 @@ func (s *service) GetAllMatchData(eventKey string) ([]store.Match, error) {
 		} else {
 			redAlliance.ID = redID
 			redTeams, err := s.GetTeamsInAlliance(redAlliance.ID)
-			if err != nil{
+			if err != nil {
 				if err != store.ErrNoResults {
 					return nil, err
 				}
@@ -319,7 +322,7 @@ func (s *service) GetAllMatchData(eventKey string) ([]store.Match, error) {
 		} else {
 			blueAlliance.ID = blueID
 			blueTeams, err := s.GetTeamsInAlliance(blueAlliance.ID)
-			if err != nil{
+			if err != nil {
 				if err != store.ErrNoResults {
 					return nil, err
 				}
@@ -374,13 +377,16 @@ func (s *service) UpdateAlliance(a store.Alliance) error {
 }
 
 func (s *service) CreateReport(r store.ReportData, allianceID int) error {
-	_, err := s.db.Exec("INSERT INTO reports(allianceID, teamNumber, score, crossedLine, deliveredGear, autoFuel, climbed, gears, teleopFuel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-		allianceID, r.Team, r.Score, r.Auto.CrossedLine, r.Auto.DeliveredGear, r.Auto.Fuel, r.Teleop.Climbed, r.Teleop.Gears, r.Teleop.Fuel)
+	_, err := s.db.Exec(
+		"INSERT INTO reports(allianceID, reporter, teamNumber, score, crossedLine, deliveredGear, autoFuel, climbed, gears, teleopFuel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+		allianceID, r.Reporter, r.Team, r.Score, r.Auto.CrossedLine, r.Auto.DeliveredGear, r.Auto.Fuel, r.Teleop.Climbed, r.Teleop.Gears, r.Teleop.Fuel)
 	return err
 }
 
 func (s *service) UpdateReport(r store.ReportData, allianceID int) error {
-	_, err := s.db.Exec("UPDATE reports SET score=$1, crossedLine=$2, deliveredGear=$3, autoFuel=$4, climbed=$5, gears=$6, teleopFuel=$7 WHERE allianceID=$8 AND teamNumber=$9", r.Score, r.Auto.CrossedLine, r.Auto.DeliveredGear, r.Auto.Fuel, r.Teleop.Climbed, r.Teleop.Gears, r.Teleop.Fuel, allianceID, r.Team)
+	_, err := s.db.Exec(
+		"UPDATE reports SET reporter = $1, score=$2, crossedLine=$3, deliveredGear=$4, autoFuel=$5, climbed=$6, gears=$7, teleopFuel=$8 WHERE allianceID=$9 AND teamNumber=$10",
+		r.Reporter, r.Score, r.Auto.CrossedLine, r.Auto.DeliveredGear, r.Auto.Fuel, r.Teleop.Climbed, r.Teleop.Gears, r.Teleop.Fuel, allianceID, r.Team)
 	return err
 }
 

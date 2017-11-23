@@ -1,10 +1,10 @@
 package postgres
 
 import (
-	"reflect"
 	"database/sql"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -62,10 +62,10 @@ var allianceCases = []struct {
 }
 
 var teamCases = []struct {
-	test store.TeamInAlliance
+	test      store.TeamInAlliance
 	insertErr bool
-	getErr bool
-} {
+	getErr    bool
+}{
 	{store.TeamInAlliance{Number: "2733", PredictedContribution: "some", ActualContribution: "nothing"}, false, false},
 	{store.TeamInAlliance{Number: "1418", ActualContribution: ""}, false, false},
 	{store.TeamInAlliance{Number: "1540b", PredictedContribution: "a lot"}, false, false},
@@ -77,14 +77,14 @@ var reportCases = []struct {
 	getErr    bool
 }{
 	{store.ReportData{
-		Alliance: "red", Team: "2733", Score: 451, Auto: store.AutoReport{
+		Reporter: "frank", Alliance: "red", Team: "2733", Score: 451, Auto: store.AutoReport{
 			CrossedLine: true, DeliveredGear: true, Fuel: 10,
 		}, Teleop: store.TeleopReport{
 			Climbed: true, Gears: 3, Fuel: 10,
 		},
 	}, false, false},
 	{store.ReportData{
-		Alliance: "blue", Team: "2471", Score: 200, Auto: store.AutoReport{
+		Reporter: "brendan", Alliance: "blue", Team: "2471", Score: 200, Auto: store.AutoReport{
 			CrossedLine: false, DeliveredGear: false, Fuel: 5,
 		}, Teleop: store.TeleopReport{
 			Climbed: false, Gears: 1, Fuel: 2,
@@ -208,11 +208,11 @@ func TestGetMatchAndGetMatches(t *testing.T) {
 		err = rawDB.QueryRow("INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
 			c.m.Key, true, 100).Scan(&allianceID)
 		assert.Equal(t, c.insertErr, err != nil, caseString)
-        _, err = rawDB.Exec("INSERT INTO teamsInAlliance (number, allianceID, predictedContribution, actualContribution) VALUES($1, $2, $3, $4)", "1540b", allianceID, "predicted", "actual")
+		_, err = rawDB.Exec("INSERT INTO teamsInAlliance (number, allianceID, predictedContribution, actualContribution) VALUES($1, $2, $3, $4)", "1540b", allianceID, "predicted", "actual")
 		assert.Equal(t, c.insertErr, err != nil, caseString)
 		// Red alliance and team
 		err = rawDB.QueryRow("INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
-		c.m.Key, false, 100).Scan(&allianceID)
+			c.m.Key, false, 100).Scan(&allianceID)
 		assert.Equal(t, c.insertErr, err != nil, caseString)
 		_, err = rawDB.Exec("INSERT INTO teamsInAlliance (number, allianceID, predictedContribution, actualContribution) VALUES($1, $2, $3, $4)", "frc2733", allianceID, "failure", "PIGMICE!")
 		assert.Equal(t, c.insertErr, err != nil, caseString)
@@ -233,8 +233,8 @@ func TestGetMatchAndGetMatches(t *testing.T) {
 			continue
 		}
 
-		mCase.m.BlueAlliance = store.Alliance {MatchKey: mCase.m.Key, IsBlue: true, Score: 100}
-		mCase.m.RedAlliance = store.Alliance {MatchKey: mCase.m.Key, IsBlue: false, Score: 100}
+		mCase.m.BlueAlliance = store.Alliance{MatchKey: mCase.m.Key, IsBlue: true, Score: 100}
+		mCase.m.RedAlliance = store.Alliance{MatchKey: mCase.m.Key, IsBlue: false, Score: 100}
 		mCase.m.BlueAlliance.Teams = []store.TeamInAlliance{store.TeamInAlliance{Number: "1540b", PredictedContribution: "predicted", ActualContribution: "actual"}}
 		mCase.m.RedAlliance.Teams = []store.TeamInAlliance{store.TeamInAlliance{Number: "frc2733", PredictedContribution: "failure", ActualContribution: "PIGMICE!"}}
 
@@ -263,7 +263,7 @@ func TestCheckMatchExistence(t *testing.T) {
 	_, err = rawDB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKey, eventKey, "red")
 	assert.Equal(t, nil, err, "inserting match for testing match existence check")
 
-	exists, err:= globalStore.CheckMatchExistence(eventKey, matchKey)
+	exists, err := globalStore.CheckMatchExistence(eventKey, matchKey)
 	assert.Equal(t, true, exists, "CheckMatchExistence failed to find inserted match")
 
 	exists, err = globalStore.CheckMatchExistence(eventKey, "frc_fakeMatchKey")
@@ -399,8 +399,8 @@ func TestCreateReportAndUpdateReport(t *testing.T) {
 
 		var rd store.ReportData
 		err = rawDB.QueryRow(
-			"SELECT teamNumber, score, crossedLine, deliveredGear, autoFuel, climbed, gears, teleopFuel FROM reports WHERE allianceID = $1",
-			allianceID).Scan(&rd.Team, &rd.Score, &rd.Auto.CrossedLine, &rd.Auto.DeliveredGear, &rd.Auto.Fuel,
+			"SELECT reporter, teamNumber, score, crossedLine, deliveredGear, autoFuel, climbed, gears, teleopFuel FROM reports WHERE allianceID = $1",
+			allianceID).Scan(&rd.Reporter, &rd.Team, &rd.Score, &rd.Auto.CrossedLine, &rd.Auto.DeliveredGear, &rd.Auto.Fuel,
 			&rd.Teleop.Climbed, &rd.Teleop.Gears, &rd.Teleop.Fuel)
 		assert.Equal(t, c.getErr, err != nil, caseString)
 
@@ -418,8 +418,8 @@ func TestCreateReportAndUpdateReport(t *testing.T) {
 
 		var updated store.ReportData
 		err = rawDB.QueryRow(
-			"SELECT teamNumber, score, crossedLine, deliveredGear, autoFuel, climbed, gears, teleopFuel FROM reports WHERE allianceID = $1",
-			allianceID).Scan(&updated.Team, &updated.Score, &updated.Auto.CrossedLine, &updated.Auto.DeliveredGear, &updated.Auto.Fuel,
+			"SELECT reporter, teamNumber, score, crossedLine, deliveredGear, autoFuel, climbed, gears, teleopFuel FROM reports WHERE allianceID = $1",
+			allianceID).Scan(&updated.Reporter, &updated.Team, &updated.Score, &updated.Auto.CrossedLine, &updated.Auto.DeliveredGear, &updated.Auto.Fuel,
 			&updated.Teleop.Climbed, &updated.Teleop.Gears, &updated.Teleop.Fuel)
 		assert.Equal(t, c.getErr, err != nil, caseString)
 
@@ -517,7 +517,7 @@ func TestDeleteUser(t *testing.T) {
 	}
 }
 
-func TestGetTeamsInAlliance (t *testing.T) {
+func TestGetTeamsInAlliance(t *testing.T) {
 	err := clearTables("reports", "teamsInAlliance", "alliances", "matches", "events")
 	assert.Equal(t, nil, err, "clearing tables")
 
@@ -579,7 +579,7 @@ func TestCreateTeamInAlliance(t *testing.T) {
 		matchKey, true, 100).Scan(&allianceID)
 	assert.Equal(t, nil, err, "inserting alliance for testing teams")
 
-	expectedTeam := store.TeamInAlliance {AllianceID: allianceID, Number: "2733c", PredictedContribution: "Definitly not going to win", ActualContribution: "Yup, didn't win",}
+	expectedTeam := store.TeamInAlliance{AllianceID: allianceID, Number: "2733c", PredictedContribution: "Definitly not going to win", ActualContribution: "Yup, didn't win"}
 	err = globalStore.CreateTeamInAlliance(allianceID, expectedTeam)
 	assert.Equal(t, nil, err, "testing CreateTeamInAlliance failed")
 
