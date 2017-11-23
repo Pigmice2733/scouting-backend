@@ -40,9 +40,9 @@ func (s Service) Middleware(inner http.Handler) http.Handler {
 		inner.ServeHTTP(w, r)
 
 		s.Debugf(
-			"%s\t%s\t%d",
+			"%-8s%s%d",
 			r.Method,
-			r.RequestURI,
+			r.URL,
 			time.Since(start),
 		)
 	})

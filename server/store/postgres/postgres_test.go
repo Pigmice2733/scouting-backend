@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"reflect"
 	"database/sql"
 	"fmt"
 	"os"
@@ -43,9 +44,9 @@ var matchCases = []struct {
 	insertErr bool
 	getErr    bool
 }{
-	{store.Match{Key: "im-a-key", EventKey: eventKey, WinningAlliance: "red"}, false, false},
-	{store.Match{Key: "prove-it", EventKey: eventKey, WinningAlliance: "blue"}, false, false},
-	{store.Match{Key: "abcdefgh", EventKey: "i-dont-exist", WinningAlliance: "red"}, true, true},
+	{store.Match{Key: "im-a-key", EventKey: eventKey, PredictedTime: time.Unix(45678, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "red"}, false, false},
+	{store.Match{Key: "prove-it", EventKey: eventKey, PredictedTime: time.Unix(36573, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "blue"}, false, false},
+	{store.Match{Key: "abcdefgh", EventKey: "i-dont-exist", PredictedTime: time.Unix(36573, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "red"}, true, true},
 }
 
 const matchKey = "im-an-event-key"
@@ -55,9 +56,19 @@ var allianceCases = []struct {
 	insertErr bool
 	getErr    bool
 }{
-	{store.Alliance{MatchKey: matchKey, Score: 100, Team1: 1, Team2: 2, Team3: 3, IsBlue: false}, false, false},
-	{store.Alliance{MatchKey: matchKey, Score: 200, Team1: 1, Team2: 2, Team3: 3, IsBlue: true}, false, false},
+	{store.Alliance{MatchKey: matchKey, IsBlue: false, Score: 100}, false, false},
+	{store.Alliance{MatchKey: matchKey, IsBlue: true, Score: 200}, false, false},
 	{store.Alliance{MatchKey: "i-dont-exist"}, true, true},
+}
+
+var teamCases = []struct {
+	test store.TeamInAlliance
+	insertErr bool
+	getErr bool
+} {
+	{store.TeamInAlliance{Number: "2733", PredictedContribution: "some", ActualContribution: "nothing"}, false, false},
+	{store.TeamInAlliance{Number: "1418", ActualContribution: ""}, false, false},
+	{store.TeamInAlliance{Number: "1540b", PredictedContribution: "a lot"}, false, false},
 }
 
 var reportCases = []struct {
@@ -66,14 +77,14 @@ var reportCases = []struct {
 	getErr    bool
 }{
 	{store.ReportData{
-		Alliance: "red", Team: 2733, Score: 451, Auto: store.AutoReport{
+		Alliance: "red", Team: "2733", Score: 451, Auto: store.AutoReport{
 			CrossedLine: true, DeliveredGear: true, Fuel: 10,
 		}, Teleop: store.TeleopReport{
 			Climbed: true, Gears: 3, Fuel: 10,
 		},
 	}, false, false},
 	{store.ReportData{
-		Alliance: "blue", Team: 2471, Score: 200, Auto: store.AutoReport{
+		Alliance: "blue", Team: "2471", Score: 200, Auto: store.AutoReport{
 			CrossedLine: false, DeliveredGear: false, Fuel: 5,
 		}, Teleop: store.TeleopReport{
 			Climbed: false, Gears: 1, Fuel: 2,
@@ -127,8 +138,8 @@ func (ki *keyInc) Key() string {
 }
 
 func TestGetEventAndGetEvents(t *testing.T) {
-	_, err := rawDB.Exec("DELETE FROM events")
-	assert.Equal(t, nil, err, "clearing events table")
+	err := clearTables("reports", "teamsInAlliance", "alliances", "matches", "events")
+	assert.Equal(t, nil, err, "clearing tables")
 
 	for i, c := range eventCases {
 		caseString := fmt.Sprintf("case idx: %d\n", i)
@@ -189,8 +200,21 @@ func TestGetMatchAndGetMatches(t *testing.T) {
 	for i, c := range matchCases {
 		caseString := fmt.Sprintf("case idx: %d\n", i)
 
-		_, err := rawDB.Exec("INSERT INTO matches VALUES ($1, $2, $3)",
-			c.m.Key, c.m.EventKey, c.m.WinningAlliance)
+		_, err := rawDB.Exec("INSERT INTO matches (key, eventKey, predictedTime, actualTime, winningAlliance) VALUES ($1, $2, $3, $4, $5)",
+			c.m.Key, c.m.EventKey, c.m.PredictedTime, c.m.ActualTime, c.m.WinningAlliance)
+		assert.Equal(t, c.insertErr, err != nil, caseString)
+		var allianceID int
+		// Blue alliance and team
+		err = rawDB.QueryRow("INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
+			c.m.Key, true, 100).Scan(&allianceID)
+		assert.Equal(t, c.insertErr, err != nil, caseString)
+        _, err = rawDB.Exec("INSERT INTO teamsInAlliance (number, allianceID, predictedContribution, actualContribution) VALUES($1, $2, $3, $4)", "1540b", allianceID, "predicted", "actual")
+		assert.Equal(t, c.insertErr, err != nil, caseString)
+		// Red alliance and team
+		err = rawDB.QueryRow("INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
+		c.m.Key, false, 100).Scan(&allianceID)
+		assert.Equal(t, c.insertErr, err != nil, caseString)
+		_, err = rawDB.Exec("INSERT INTO teamsInAlliance (number, allianceID, predictedContribution, actualContribution) VALUES($1, $2, $3, $4)", "frc2733", allianceID, "failure", "PIGMICE!")
 		assert.Equal(t, c.insertErr, err != nil, caseString)
 
 		m, err := globalStore.GetMatch(c.m.EventKey, c.m.Key)
@@ -201,26 +225,49 @@ func TestGetMatchAndGetMatches(t *testing.T) {
 		}
 	}
 
-	matches, err := globalStore.GetMatches(eventKey)
+	matches, err := globalStore.GetAllMatchData(eventKey)
 	assert.Equal(t, nil, err)
 
 	for _, mCase := range matchCases {
-		if mCase.insertErr || mCase.getErr {
+		if mCase.insertErr || mCase.getErr || mCase.m.EventKey != eventKey {
 			continue
 		}
 
+		mCase.m.BlueAlliance = store.Alliance {MatchKey: mCase.m.Key, IsBlue: true, Score: 100}
+		mCase.m.RedAlliance = store.Alliance {MatchKey: mCase.m.Key, IsBlue: false, Score: 100}
+		mCase.m.BlueAlliance.Teams = []store.TeamInAlliance{store.TeamInAlliance{Number: "1540b", PredictedContribution: "predicted", ActualContribution: "actual"}}
+		mCase.m.RedAlliance.Teams = []store.TeamInAlliance{store.TeamInAlliance{Number: "frc2733", PredictedContribution: "failure", ActualContribution: "PIGMICE!"}}
+
 		var exists bool
 		for _, mGot := range matches {
-			if mCase.m.EventKey != eventKey {
-				continue
-			}
-			if mGot == mCase.m {
+			mCase.m.BlueAlliance.ID = mGot.BlueAlliance.ID
+			mCase.m.BlueAlliance.Teams[0].AllianceID = mGot.BlueAlliance.ID
+			mCase.m.RedAlliance.ID = mGot.RedAlliance.ID
+			mCase.m.RedAlliance.Teams[0].AllianceID = mGot.RedAlliance.ID
+			if reflect.DeepEqual(mGot, mCase.m) {
 				exists = true
 			}
 		}
 		assert.Equal(t, true, exists)
 	}
 	// shhh O(n^2) is fine for testing
+}
+
+func TestCheckMatchExistence(t *testing.T) {
+	err := clearTables("teamsInAlliance", "alliances", "matches", "events")
+	assert.Equal(t, nil, err, "clearing tables")
+
+	_, err = rawDB.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
+	assert.Equal(t, nil, err, "inserting event for testing matches")
+
+	_, err = rawDB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKey, eventKey, "red")
+	assert.Equal(t, nil, err, "inserting match for testing match existence check")
+
+	exists, err:= globalStore.CheckMatchExistence(eventKey, matchKey)
+	assert.Equal(t, true, exists, "CheckMatchExistence failed to find inserted match")
+
+	exists, err = globalStore.CheckMatchExistence(eventKey, "frc_fakeMatchKey")
+	assert.Equal(t, false, exists, "CheckMatchExistence found non-existent match")
 }
 
 func TestCreateMatchAndUpdateMatch(t *testing.T) {
@@ -241,8 +288,8 @@ func TestCreateMatchAndUpdateMatch(t *testing.T) {
 		}
 
 		var m store.Match
-		err = rawDB.QueryRow("SELECT key, eventKey, winningAlliance FROM matches WHERE key = $1 AND eventKey = $2",
-			c.m.Key, c.m.EventKey).Scan(&m.Key, &m.EventKey, &m.WinningAlliance)
+		err = rawDB.QueryRow("SELECT key, eventKey, predictedTime, actualTime, winningAlliance FROM matches WHERE key = $1 AND eventKey = $2",
+			c.m.Key, c.m.EventKey).Scan(&m.Key, &m.EventKey, &m.PredictedTime, &m.ActualTime, &m.WinningAlliance)
 
 		assert.Equal(t, c.m, m, caseString)
 	}
@@ -252,18 +299,18 @@ func TestGetAlliance(t *testing.T) {
 	err := clearTables("alliances", "matches", "events")
 	assert.Equal(t, nil, err, "clearing tables")
 
-	_, err = rawDB.Exec("INSERT INTO events VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
+	_, err = rawDB.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
 	assert.Equal(t, nil, err, "inserting event for testing matches")
 
-	_, err = rawDB.Exec("INSERT INTO matches VALUES ($1, $2, $3)", matchKey, eventKey, "red")
+	_, err = rawDB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKey, eventKey, "red")
 	assert.Equal(t, nil, err, "inserting match for testing alliances")
 
 	for i, c := range allianceCases {
 		caseString := fmt.Sprintf("case idx: %d\n", i)
 
 		_, err := rawDB.Exec(
-			"INSERT INTO alliances(matchKey, score, team1, team2, team3, isBlue) VALUES ($1, $2, $3, $4, $5, $6)",
-			c.a.MatchKey, c.a.Score, c.a.Team1, c.a.Team2, c.a.Team3, c.a.IsBlue)
+			"INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3)",
+			c.a.MatchKey, c.a.IsBlue, c.a.Score)
 		assert.Equal(t, c.insertErr, err != nil, caseString)
 
 		if c.insertErr {
@@ -271,6 +318,7 @@ func TestGetAlliance(t *testing.T) {
 		}
 
 		a, _, err := globalStore.GetAlliance(c.a.MatchKey, c.a.IsBlue)
+		a.ID = 0
 		assert.Equal(t, c.getErr, err != nil, caseString)
 
 		if !c.insertErr && !c.getErr {
@@ -286,7 +334,7 @@ func TestCreateAllianceAndUpdateAlliance(t *testing.T) {
 	_, err = rawDB.Exec("INSERT INTO events VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
 	assert.Equal(t, nil, err, "inserting event for testing matches")
 
-	_, err = rawDB.Exec("INSERT INTO matches VALUES ($1, $2, $3)", matchKey, eventKey, "red")
+	_, err = rawDB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKey, eventKey, "red")
 	assert.Equal(t, nil, err, "inserting match for testing alliances")
 
 	for i, c := range allianceCases {
@@ -301,20 +349,20 @@ func TestCreateAllianceAndUpdateAlliance(t *testing.T) {
 
 		var a store.Alliance
 		err = rawDB.QueryRow(
-			"SELECT matchKey, score, team1, team2, team3, isBlue FROM alliances WHERE matchKey = $1 AND isBlue = $2",
-			c.a.MatchKey, c.a.IsBlue).Scan(&a.MatchKey, &a.Score, &a.Team1, &a.Team2, &a.Team3, &a.IsBlue)
+			"SELECT matchKey, isBlue, score FROM alliances WHERE matchKey = $1 AND isBlue = $2",
+			c.a.MatchKey, c.a.IsBlue).Scan(&a.MatchKey, &a.IsBlue, &a.Score)
 		assert.Equal(t, c.getErr, err != nil, caseString)
 
 		assert.Equal(t, c.a, a, caseString)
 
-		a = store.Alliance{MatchKey: a.MatchKey, IsBlue: a.IsBlue, Team1: a.Team1 * 2, Team2: a.Team2 * 2, Team3: a.Team3 * 2, Score: a.Score * 2}
+		a = store.Alliance{MatchKey: a.MatchKey, IsBlue: a.IsBlue, Score: a.Score * 2}
 		err = globalStore.UpdateAlliance(a)
 		assert.Equal(t, c.insertErr, err != nil, caseString)
 
 		var updated store.Alliance
 		err = rawDB.QueryRow(
-			"SELECT matchKey, score, team1, team2, team3, isBlue FROM alliances WHERE matchKey = $1 AND isBlue = $2",
-			a.MatchKey, a.IsBlue).Scan(&updated.MatchKey, &updated.Score, &updated.Team1, &updated.Team2, &updated.Team3, &updated.IsBlue)
+			"SELECT matchKey, isBlue, score FROM alliances WHERE matchKey = $1 AND isBlue = $2",
+			a.MatchKey, a.IsBlue).Scan(&updated.MatchKey, &updated.IsBlue, &updated.Score)
 		assert.Equal(t, c.getErr, err != nil, caseString)
 
 		assert.Equal(t, a, updated, caseString)
@@ -334,13 +382,13 @@ func TestCreateReportAndUpdateReport(t *testing.T) {
 		_, err = rawDB.Exec("INSERT INTO events VALUES ($1, $2, $3)", eventKeyInc.Next(), "", time.Unix(10000, 0))
 		assert.Equal(t, nil, err, "inserting event for testing matches")
 
-		_, err = rawDB.Exec("INSERT INTO matches VALUES ($1, $2, $3)", matchKeyInc.Next(), eventKeyInc.Key(), c.rd.Alliance)
+		_, err = rawDB.Exec("INSERT INTO matches(key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKeyInc.Next(), eventKeyInc.Key(), c.rd.Alliance)
 		assert.Equal(t, nil, err, "inserting match for testing alliances")
 
 		var allianceID int
 		err = rawDB.QueryRow(
-			"INSERT INTO alliances(matchKey, score, team1, team2, team3, isBlue) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-			matchKeyInc.Key(), 100, 1, 2, 3, c.rd.Alliance == "blue").Scan(&allianceID)
+			"INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
+			matchKeyInc.Key(), c.rd.Alliance == "blue", 100).Scan(&allianceID)
 
 		err := globalStore.CreateReport(c.rd, allianceID)
 		assert.Equal(t, c.insertErr, err != nil, caseString)
@@ -420,7 +468,6 @@ func TestGetUserAndGetUsers(t *testing.T) {
 		assert.Equal(t, true, exists)
 	}
 	// shhh O(n^2) is fine for testing
-
 }
 
 func TestCreateUser(t *testing.T) {
@@ -468,4 +515,77 @@ func TestDeleteUser(t *testing.T) {
 			&user.Username, &user.HashedPassword)
 		assert.Equal(t, sql.ErrNoRows, err, caseString)
 	}
+}
+
+func TestGetTeamsInAlliance (t *testing.T) {
+	err := clearTables("reports", "teamsInAlliance", "alliances", "matches", "events")
+	assert.Equal(t, nil, err, "clearing tables")
+
+	_, err = rawDB.Exec("INSERT INTO events VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
+	assert.Equal(t, nil, err, "inserting event for testing matches")
+
+	_, err = rawDB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKey, eventKey, "red")
+	assert.Equal(t, nil, err, "inserting match for testing alliances")
+
+	var allianceID int
+	err = rawDB.QueryRow(
+		"INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
+		matchKey, true, 100).Scan(&allianceID)
+	assert.Equal(t, nil, err, "inserting alliance for testing teams")
+
+	for i, c := range teamCases {
+		caseString := fmt.Sprintf("case idx: %d\n", i)
+
+		_, err := rawDB.Exec("INSERT INTO teamsInAlliance (number, allianceID, predictedContribution, actualContribution) VALUES($1, $2, $3, $4)", c.test.Number, allianceID, c.test.PredictedContribution, c.test.ActualContribution)
+		assert.Equal(t, c.insertErr, err != nil, caseString)
+
+		if c.insertErr {
+			continue
+		}
+	}
+
+	teams, err := globalStore.GetTeamsInAlliance(allianceID)
+	assert.Equal(t, nil, err)
+
+	for _, tCase := range teamCases {
+		if tCase.insertErr || tCase.getErr {
+			continue
+		}
+		var exists bool
+		for _, tGot := range teams {
+			tCase.test.AllianceID = tGot.AllianceID
+			if tGot == tCase.test {
+				exists = true
+			}
+		}
+
+		assert.Equal(t, true, exists)
+	}
+}
+
+func TestCreateTeamInAlliance(t *testing.T) {
+	err := clearTables("reports", "teamsInAlliance", "alliances", "matches", "events")
+	assert.Equal(t, nil, err, "clearing tables")
+
+	_, err = rawDB.Exec("INSERT INTO events VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
+	assert.Equal(t, nil, err, "inserting event for testing matches")
+
+	_, err = rawDB.Exec("INSERT INTO matches (key, eventKey, winningAlliance) VALUES ($1, $2, $3)", matchKey, eventKey, "red")
+	assert.Equal(t, nil, err, "inserting match for testing alliances")
+
+	var allianceID int
+	err = rawDB.QueryRow(
+		"INSERT INTO alliances(matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id",
+		matchKey, true, 100).Scan(&allianceID)
+	assert.Equal(t, nil, err, "inserting alliance for testing teams")
+
+	expectedTeam := store.TeamInAlliance {AllianceID: allianceID, Number: "2733c", PredictedContribution: "Definitly not going to win", ActualContribution: "Yup, didn't win",}
+	err = globalStore.CreateTeamInAlliance(allianceID, expectedTeam)
+	assert.Equal(t, nil, err, "testing CreateTeamInAlliance failed")
+
+	actualTeam := store.TeamInAlliance{}
+	row := rawDB.QueryRow("SELECT number, allianceID, predictedContribution, actualContribution FROM teamsInAlliance WHERE number=$1", "2733c")
+	err = row.Scan(&actualTeam.Number, &actualTeam.AllianceID, &actualTeam.PredictedContribution, &actualTeam.ActualContribution)
+	assert.Equal(t, nil, err, "testing if CreateTeamInAlliance actually created team failed")
+	assert.Equal(t, expectedTeam, actualTeam, "testing if CreateTeamInAlliance created correct team failed")
 }

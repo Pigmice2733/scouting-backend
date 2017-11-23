@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -54,18 +53,12 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 	s.initializeRouter()
 	s.initializeMiddlewares()
 
-	s.logger = logger.New(logWriter, logger.Settings{
-		Debug: environment == "dev",
-		Info:  true,
-		Error: true,
-	})
-
 	s.tbaAPIKey = tbaAPIKey
 
 	var err error
 	s.jwtSecret, err = generateSecret(64)
 	if err != nil {
-		return s, fmt.Errorf("error: generating jwt secret: %v\n", err)
+		return s, fmt.Errorf("error: generating jwt secret: %v", err)
 	}
 
 	return s, nil
@@ -94,7 +87,7 @@ func (s *Server) initializeRouter() {
 	router.HandleFunc("/events/{eventKey}", s.getEvent).Methods("GET")
 	router.HandleFunc("/events/{eventKey}/{matchKey}", s.getMatch).Methods("GET")
 	router.Handle("/events/{eventKey}/{matchKey}", s.authHandler(http.HandlerFunc(s.postReport))).Methods("POST")
-	router.Handle("/events/{eventKey}/{matchKey}/{team:[0-9]+}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
+	router.Handle("/events/{eventKey}/{matchKey}/{team}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
 
 	s.Handler = router
 
@@ -206,7 +199,7 @@ func (s *Server) getUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
 }
 
@@ -302,16 +295,16 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches, err := s.pollTBAMatches("https://www.thebluealliance.com/api/v3", s.tbaAPIKey, e.Key)
+	err = s.pollTBAMatches("https://www.thebluealliance.com/api/v3", s.tbaAPIKey, e.Key)
 	if err != nil {
 		s.logger.Infof(err.Error())
+	}
 
-		matches, err = s.store.GetMatches(e.Key)
-		if err != nil && err != store.ErrNoResults {
-			s.logger.Errorf("error: getting events: %v\n", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
+	matches, err := s.store.GetAllMatchData(e.Key)
+	if err != nil && err != store.ErrNoResults {
+		s.logger.Errorf("error: getting events: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	fullEvent := store.FullEvent{
@@ -381,15 +374,26 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fullMatch := &store.FullMatch{
-		Key:             match.Key,
-		EventKey:        match.EventKey,
-		WinningAlliance: match.WinningAlliance,
-		RedAlliance:     redAlliance,
-		BlueAlliance:    blueAlliance,
+	blueTeams, err := s.store.GetTeamsInAlliance(blueAlliance.ID)
+	if err != nil {
+		s.logger.Errorf("error: getting alliance teams: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	redTeams, err := s.store.GetTeamsInAlliance(redAlliance.ID)
+	if err != nil {
+		s.logger.Errorf("error: getting alliance teams: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
-	response, err := json.Marshal(fullMatch)
+	blueAlliance.Teams = blueTeams
+	redAlliance.Teams = redTeams
+
+	match.BlueAlliance = blueAlliance
+	match.RedAlliance = redAlliance
+
+	response, err := json.Marshal(match)
 	if err != nil {
 		s.logger.Errorf("error: marshalling json response %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -420,6 +424,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	matchKey := vars["matchKey"]
+	eventKey := vars["eventKey"]
 
 	var report store.ReportData
 	decoder := json.NewDecoder(r.Body)
@@ -428,55 +433,75 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request payload", http.StatusBadRequest)
 		return
 	}
-
 	defer r.Body.Close()
 
-	allianceID, a, err := s.findAlliance(matchKey, report)
-
+	matchExists, err := s.store.CheckMatchExistence(eventKey, matchKey)
 	if err != nil {
+		s.logger.Errorf("error: check if match exists %v. matchKey '%v' eventKey '%v'\n", err, matchKey, eventKey)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if !matchExists {
+		http.Error(w, "error: posting report to non-existent match", http.StatusBadRequest)
+		return
+	}
+
+	alllianceID, a, err := s.findAlliance(matchKey, report)
+	if err != nil {
+		s.logger.Errorf("ERROR: Alliance for match somehow not created! %v %v", matchKey, report)
 		if err != store.ErrNoResults {
 			s.logger.Errorf("error: nothing present in response: %v\n", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		a.Team1 = report.Team
-		allianceID, err = s.store.CreateAlliance(a)
+		team := store.TeamInAlliance{
+			Number: report.Team,
+		}
+		a.Teams = []store.TeamInAlliance{team}
+		allianceID, err := s.store.CreateAlliance(a)
+		a.ID = allianceID
 		if err != nil {
 			http.Error(w, "no corresponding match for posted report", http.StatusBadRequest)
 			return
 		}
-	} else {
-		teamReportAlreadyExists := false
-		switch {
-		case a.Team2 == 0:
-			if a.Team1 == report.Team {
-				teamReportAlreadyExists = true
-			}
-			a.Team2 = report.Team
-		case a.Team3 == 0:
-			if a.Team1 == report.Team || a.Team2 == report.Team {
-				teamReportAlreadyExists = true
-			}
-			a.Team3 = report.Team
-		default:
-			http.Error(w, "more than three reports for a single alliance not permitted", http.StatusBadRequest)
-			return
-		}
-
-		if teamReportAlreadyExists {
-			http.Error(w, "report for team already exists, use 'PUT' to update", http.StatusConflict)
-			return
-		}
-
-		err := s.store.UpdateAlliance(a)
+		err = s.store.CreateTeamInAlliance(allianceID, team)
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			http.Error(w, "failed to create team in alliance", http.StatusBadRequest)
+			return
+		}
+	} else {
+		a.ID = alllianceID
+		teams, err := s.store.GetTeamsInAlliance(a.ID)
+		for _, team := range teams {
+			if report.Team == team.Number {
+				http.Error(w, "report for team already exists, use 'PUT' to update", http.StatusConflict)
+				return
+			}
+		}
+
+        a.Score = report.Score
+		err = s.store.UpdateAlliance(a)
+		if err != nil {
+			http.Error(w, "failed to update alliance data", http.StatusBadRequest)
+			return
+		}
+
+		team := store.TeamInAlliance{
+			Number: report.Team,
+		}
+		a.Teams = []store.TeamInAlliance{team}
+		err = s.store.CreateTeamInAlliance(a.ID, team)
+		if err != nil {
+			http.Error(w, "failed to create team in alliance", http.StatusBadRequest)
 			return
 		}
 	}
 
-	if err := s.store.CreateReport(report, allianceID); err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+
+	if err := s.store.CreateReport(report, a.ID); err != nil {
+		s.logger.Errorf("error: postreport: %v\n", err)
+	  http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -501,11 +526,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	matchKey := vars["matchKey"]
-	teamNumber, err := strconv.Atoi(vars["team"])
-	if err != nil {
-		http.Error(w, "invalid team number", http.StatusBadRequest)
-		return
-	}
+	teamNumber := vars["team"]
 
 	var report store.ReportData
 	decoder := json.NewDecoder(r.Body)
@@ -527,9 +548,15 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-
-	teamReportExists := (a.Team1 == report.Team || a.Team2 == report.Team || a.Team3 == report.Team)
-
+	a.ID = allianceID
+	teams, err := s.store.GetTeamsInAlliance(a.ID)
+	teamReportExists := false
+	for _, team := range teams {
+		if report.Team == team.Number {
+			teamReportExists = true
+			break
+		}
+	}
 	if !teamReportExists {
 		http.Error(w, "report does not exist, use 'POST' to create a new report", http.StatusNotFound)
 		return
@@ -540,7 +567,8 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.UpdateReport(report, allianceID); err != nil {
+	if err := s.store.UpdateReport(report, a.ID); err != nil {
+		s.logger.Errorf("error: updateReport %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -567,7 +595,6 @@ func (s *Server) findAlliance(matchKey string, report store.ReportData) (int, st
 	}
 
 	a, id, err := s.store.GetAlliance(matchKey, isBlue)
-	a.Score = report.Score
 
 	return id, a, err
 }
@@ -624,6 +651,7 @@ func addDefaultHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// GenerateJWT creates a new token for an authenticated user
 func (s *Server) GenerateJWT(username string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		Subject:   username,

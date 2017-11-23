@@ -83,6 +83,6 @@ func TestMiddleware(t *testing.T) {
 	out, err := buf.ReadString('\n')
 	out = out[20:]
 	assert.Equal(t, err, nil)
-	assert.Equal(t, strings.HasPrefix(out, fmt.Sprintf("%s %s\t%s\t", debugPrefix, "GET", "/")), true)
+	assert.Equal(t, strings.HasPrefix(out, fmt.Sprintf("%s %-8s%s", debugPrefix, "GET", "/")), true)
 	assert.Equal(t, w.Body.Bytes(), echo)
 }

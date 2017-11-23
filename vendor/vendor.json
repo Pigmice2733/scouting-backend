@@ -9,6 +9,13 @@
 			"revisionTime": "2017-11-09T10:59:03Z"
 		},
 		{
+			"checksumSHA1": "DuEyF75v9xaKXfJsCPRdHNOpGZk=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "2aa2c176b9dab406a6970f6a55f513e8a8c8b18f",
+			"revisionTime": "2017-08-14T20:04:35Z"
+		},
+		{
 			"checksumSHA1": "0sh4FXicINLD/q5WM0qnXLan21g=",
 			"path": "github.com/dgrijalva/jwt-go",
 			"revision": "dbeaa9332f19a944acb5736b4456cfcc02140e29",
@@ -68,6 +75,19 @@
 			"path": "github.com/patrickmn/go-cache",
 			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
 			"revisionTime": "2017-11-18T22:44:42Z"
+		},
+		{
+			"checksumSHA1": "+oyIJwPyeof36XCkY8awrNfxaNM=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "2aa2c176b9dab406a6970f6a55f513e8a8c8b18f",
+			"revisionTime": "2017-08-14T20:04:35Z"
+		},
+		{
+			"checksumSHA1": "5YCFabYzA1Zv/nGy35VDX5WBP4E=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "2aa2c176b9dab406a6970f6a55f513e8a8c8b18f",
+			"revisionTime": "2017-08-14T20:04:35Z"
 		},
 		{
 			"checksumSHA1": "UWjVYmoHlIfHzVIskELHiJQtMOI=",

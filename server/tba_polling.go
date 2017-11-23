@@ -71,7 +71,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 		newEvent := store.Event{
 			Key:  tbaEvent.Key,
 			Name: tbaEvent.Name,
-			Date: date,
+			Date: date.UTC(),
 		}
 		events = append(events, newEvent)
 	}
@@ -85,9 +85,23 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 	return nil
 }
 
-func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) ([]store.Match, error) {
+func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) error {
 	type tbaMatch struct {
-		Key string `json:"key"`
+		Key             string `json:"key"`
+		ScheduledTime   int64  `json:"time"`
+		PredictedTime   int64  `json:"predicted_time"`
+		ActualTime      int64  `json:"actual_time"`
+		WinningAlliance string `json:"winning_alliance"`
+		Alliances       struct {
+			Blue struct {
+				Score int      `json:"score"`
+				Teams []string `json:"team_keys"`
+			} `json:"blue"`
+			Red struct {
+				Score int      `json:"score"`
+				Teams []string `json:"team_keys"`
+			} `json:"red"`
+		} `json:"alliances"`
 	}
 	var tbaMatches []tbaMatch
 
@@ -95,7 +109,7 @@ func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) (
 
 	req, err := http.NewRequest("GET", matchesEndpoint, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	lastModified, err := s.store.MatchModifiedData(eventKey)
@@ -109,42 +123,94 @@ func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) (
 	response, err := client.Do(req)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	lastModified = response.Header.Get("Last-Modified")
 	if lastModified != "" {
 		if err := s.store.SetMatchModifiedData(lastModified, eventKey); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	responseCode := response.StatusCode
 
 	if responseCode == http.StatusNotModified {
-		return nil, nil
+		return nil
 	} else if responseCode != http.StatusOK {
-		return nil, fmt.Errorf("error: TBA polling request failed with status: %v", responseCode)
+		return fmt.Errorf("error: TBA polling request failed with status: %v", responseCode)
 	}
 
 	if err := json.NewDecoder(response.Body).Decode(&tbaMatches); err != nil {
-		return nil, err
+		return err
 	}
 
 	var matches []store.Match
 
 	for _, tbaMatch := range tbaMatches {
-		newMatch := store.Match{
-			Key:      tbaMatch.Key,
-			EventKey: eventKey,
+		var predictedMatchTime time.Time
+		var actualMatchTime time.Time
+
+		if !time.Unix(tbaMatch.PredictedTime, 0).IsZero() {
+			predictedMatchTime = time.Unix(tbaMatch.PredictedTime, 0)
+		} else if !time.Unix(tbaMatch.ScheduledTime, 0).IsZero() {
+			predictedMatchTime = time.Unix(tbaMatch.ScheduledTime, 0)
+		} else {
+			predictedMatchTime = time.Time{}
 		}
+
+		if !time.Unix(tbaMatch.ActualTime, 0).IsZero() {
+			actualMatchTime = time.Unix(tbaMatch.ActualTime, 0)
+		} else {
+			actualMatchTime = time.Time{}
+		}
+
+		newMatch := store.Match{
+			Key:             tbaMatch.Key,
+			EventKey:        eventKey,
+			PredictedTime:   predictedMatchTime.UTC(),
+			ActualTime:      actualMatchTime.UTC(),
+			WinningAlliance: tbaMatch.WinningAlliance,
+		}
+
+		newMatch.RedAlliance, err = populateAlliance(false, tbaMatch.Key, tbaMatch.Alliances.Red)
+		if err != nil {
+			return err
+		}
+		newMatch.BlueAlliance, err = populateAlliance(true, tbaMatch.Key, tbaMatch.Alliances.Blue)
+		if err != nil {
+			return err
+		}
+
 		matches = append(matches, newMatch)
 	}
 
 	err = s.store.UpdateMatches(matches)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return matches, nil
+	return nil
+}
+
+// Use data from tba to populate an alliance struct
+func populateAlliance(isBlue bool, matchKey string, allianceData struct {
+	Score int      `json:"score"`
+	Teams []string `json:"team_keys"`
+}) (store.Alliance, error) {
+	alliance := store.Alliance{
+		MatchKey: matchKey,
+		IsBlue:   isBlue,
+		Score:    allianceData.Score,
+	}
+
+	for _, teamKey := range allianceData.Teams {
+		team := store.TeamInAlliance{
+			Number: teamKey,
+		}
+
+		alliance.Teams = append(alliance.Teams, team)
+	}
+
+	return alliance, nil
 }
