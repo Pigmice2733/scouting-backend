@@ -7,11 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Pigmice2733/scouting-backend/server/logger"
 	"github.com/Pigmice2733/scouting-backend/server/store"
 )
 
-func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey string, year string) error {
+func (s *Server) pollTBAEvents(tbaAPI string, apikey string, year string) error {
 	type tbaEvent struct {
 		Key  string `json:"key"`
 		Name string `json:"name"`
@@ -50,7 +49,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 	responseCode := response.StatusCode
 
 	if responseCode == http.StatusNotModified {
-		logger.Debugf("TBA event data not modified")
+		s.logger.Debugf("TBA event data not modified")
 		return nil
 	} else if responseCode != http.StatusOK {
 		return fmt.Errorf("TBA polling request failed with status %d", responseCode)
@@ -65,7 +64,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 	for _, tbaEvent := range tbaEvents {
 		date, err := time.Parse("2006-01-02", tbaEvent.Date)
 		if err != nil {
-			logger.Debugf("error parsing TBA time data: %v\n", err)
+			s.logger.Debugf("error parsing TBA time data: %v\n", err)
 			continue
 		}
 		newEvent := store.Event{
@@ -84,7 +83,7 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 		return fmt.Errorf("error: updating events")
 	}
 
-	logger.Infof("Polled TBA...")
+	s.logger.Infof("Polled TBA...")
 	return nil
 }
 

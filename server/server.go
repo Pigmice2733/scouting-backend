@@ -72,7 +72,7 @@ func (s *Server) Run(addr string) error {
 
 // PollTBA polls The Blue Alliance api to populate database
 func (s *Server) PollTBA(year string) error {
-	return s.pollTBAEvents(s.logger, "https://www.thebluealliance.com/api/v3", s.tbaAPIKey, year)
+	return s.pollTBAEvents("https://www.thebluealliance.com/api/v3", s.tbaAPIKey, year)
 }
 
 func (s *Server) initializeRouter() {
@@ -96,10 +96,10 @@ func (s *Server) initializeRouter() {
 
 func (s *Server) initializeMiddlewares() {
 	s.Handler = tollbooth.LimitHandler(tollbooth.NewLimiter(1, nil),
-		(limitHandler(
+		limitHandler(
 			s.logger.Middleware(
 				gziphandler.GzipHandler(
-					addDefaultHeaders(s.Handler))))))
+					addDefaultHeaders(s.Handler)))))
 }
 
 // REST Endpoint Handlers -----------------------
