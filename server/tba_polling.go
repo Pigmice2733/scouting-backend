@@ -76,9 +76,12 @@ func (s *Server) pollTBAEvents(logger logger.Service, tbaAPI string, apikey stri
 		events = append(events, newEvent)
 	}
 
-	err = s.store.UpdateEvents(events)
-	if err != nil {
-		return fmt.Errorf("error: updating events: %v", err)
+	errs := s.store.UpdateEvents(events)
+	if len(errs) != 0 {
+		for _, err := range errs {
+			s.logger.Errorf("error: updating events: %v\n", err)
+		}
+		return fmt.Errorf("error: updating events")
 	}
 
 	logger.Infof("Polled TBA...")
@@ -185,9 +188,12 @@ func (s *Server) pollTBAMatches(tbaAPI string, apikey string, eventKey string) e
 		matches = append(matches, newMatch)
 	}
 
-	err = s.store.UpdateMatches(matches)
-	if err != nil {
-		return err
+	errs := s.store.UpdateMatches(matches)
+	if len(errs) != 0 {
+		for _, err := range errs {
+			s.logger.Errorf("error: updating events: %v\n", err)
+		}
+		return fmt.Errorf("error: updating events")
 	}
 
 	return nil

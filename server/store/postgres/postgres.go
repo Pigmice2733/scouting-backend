@@ -8,8 +8,6 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/Pigmice2733/scouting-backend/server/store"
-	// Register postgres driver
-	_ "github.com/lib/pq"
 )
 
 const eventTableCreationQuery = `
@@ -186,18 +184,24 @@ func (s *service) GetEvents() ([]store.Event, error) {
 	return events, nil
 }
 
-func (s *service) UpdateEvents(events []store.Event) error {
-	eventQueue := make(chan store.Event)
+func (s *service) UpdateEvents(events []store.Event) []error {
+	errorQueue := make(chan error)
 
-	for _, e := range events {
-		eventQueue <- e
+	for _, event := range events {
+		go func(e store.Event) {
+			_, err := s.db.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3) ON CONFLICT (key) DO UPDATE SET name = $2, date = $3", e.Key, e.Name, e.Date)
+			errorQueue <- err
+		}(event)
 	}
-	close(eventQueue)
 
-	for i := 0; i < 16; i++ {
-		go s.receiveAndUpdateEvents(eventQueue)
+	var errors []error
+	for i := 0; i < len(events); i++ {
+		if err := <-errorQueue; err != nil {
+			errors = append(errors, err)
+		}
 	}
-	return nil
+
+	return errors
 }
 
 func (s *service) CheckMatchExistence(eventKey string, matchKey string) (bool, error) {
@@ -338,18 +342,23 @@ func (s *service) GetAllMatchData(eventKey string) ([]store.Match, error) {
 	return matches, nil
 }
 
-func (s *service) UpdateMatches(matches []store.Match) error {
-	matchQueue := make(chan store.Match)
+func (s *service) UpdateMatches(matches []store.Match) []error {
+	errorQueue := make(chan error)
 
-	for _, m := range matches {
-		matchQueue <- m
+	for _, match := range matches {
+		go func(match store.Match) {
+			errorQueue <- s.upsertMatch(match)
+		}(match)
 	}
-	close(matchQueue)
 
-	for i := 0; i < 16; i++ {
-		go s.upsertMatches(matchQueue)
+	var errors []error
+	for i := 0; i < len(matches); i++ {
+		if err := <-errorQueue; err != nil {
+			errors = append(errors, err)
+		}
 	}
-	return nil
+
+	return errors
 }
 
 func (s *service) CreateAlliance(a store.Alliance) (allianceID int, err error) {
@@ -512,53 +521,52 @@ func (s *service) CreateTeamInAlliance(allianceID int, team store.TeamInAlliance
 	return err
 }
 
-func (s *service) upsertMatches(matches <-chan store.Match) {
-	for match := range matches {
-		transaction, err := s.db.Begin()
-		if err != nil {
-			continue
-		}
-
-		err = s.upsertMatch(match)
-		if err != nil {
-			transaction.Rollback()
-			continue
-		}
-
-		redAllianceID, err := s.upsertAlliance(match.RedAlliance)
-		if err != nil {
-			transaction.Rollback()
-			continue
-		}
-		for _, team := range match.RedAlliance.Teams {
-			team.AllianceID = redAllianceID
-			if err := s.upsertTeamData(team); err != nil {
-				transaction.Rollback()
-				continue
-			}
-		}
-
-		blueAllianceID, err := s.upsertAlliance(match.BlueAlliance)
-		if err != nil {
-			transaction.Rollback()
-			continue
-		}
-		for _, team := range match.BlueAlliance.Teams {
-			team.AllianceID = blueAllianceID
-			if err := s.upsertTeamData(team); err != nil {
-				transaction.Rollback()
-				continue
-			}
-		}
-
-		transaction.Commit()
+func (s *service) upsertMatch(match store.Match) error {
+	transaction, err := s.db.Begin()
+	if err != nil {
+		return err
 	}
+
+	err = upsertOnlyMatch(transaction, match)
+	if err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	redAllianceID, err := upsertAlliance(transaction, match.RedAlliance)
+	if err != nil {
+		transaction.Rollback()
+		return err
+	}
+	for _, team := range match.RedAlliance.Teams {
+		team.AllianceID = redAllianceID
+		if err := upsertTeamData(transaction, team); err != nil {
+			transaction.Rollback()
+			return err
+		}
+	}
+
+	blueAllianceID, err := upsertAlliance(transaction, match.BlueAlliance)
+	if err != nil {
+		transaction.Rollback()
+		return err
+	}
+	for _, team := range match.BlueAlliance.Teams {
+		team.AllianceID = blueAllianceID
+		if err := upsertTeamData(transaction, team); err != nil {
+			transaction.Rollback()
+			return err
+		}
+	}
+
+	transaction.Commit()
+	return nil
 }
 
 // Performs modified upsert - set values are not overwritten with null
-func (s *service) upsertMatch(m store.Match) error {
+func upsertOnlyMatch(tx *sql.Tx, m store.Match) error {
 	var winningAllianceData sql.NullString
-	row := s.db.QueryRow("SELECT winningAlliance FROM matches WHERE eventKey=? AND key=?", m.EventKey, m.Key)
+	row := tx.QueryRow("SELECT winningAlliance FROM matches WHERE eventKey=$1 AND key=$2", m.EventKey, m.Key)
 	if err := row.Scan(&winningAllianceData); err != nil {
 		if err == sql.ErrNoRows {
 			winningAllianceData.Valid = false
@@ -572,18 +580,18 @@ func (s *service) upsertMatch(m store.Match) error {
 		winner = m.WinningAlliance
 	}
 
-	_, err := s.db.Exec("INSERT OR REPLACE INTO matches (key, eventKey, predictedTime, actualTime, winningAlliance) VALUES (?, ?, ?, ?, ?)", m.Key, m.EventKey, m.PredictedTime, m.ActualTime, winner)
+	_, err := tx.Exec("INSERT INTO matches (key, eventKey, predictedTime, actualTime, winningAlliance) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (key) DO UPDATE SET predictedTime = $3, actualTime = $4, winningAlliance = $5", m.Key, m.EventKey, m.PredictedTime, m.ActualTime, winner)
 	return err
 }
 
 // Performs a modified upsert with an alliance. If value is set
 // to null in db but not in struct db is not overwritten. Returns ID of alliance.
-func (s *service) upsertAlliance(a store.Alliance) (allianceID int, err error) {
+func upsertAlliance(tx *sql.Tx, a store.Alliance) (allianceID int, err error) {
 	var scoreData sql.NullInt64
-	row := s.db.QueryRow("SELECT id, score FROM alliances WHERE matchKey=$1 AND isBlue=$2", a.MatchKey, a.IsBlue)
+	row := tx.QueryRow("SELECT id, score FROM alliances WHERE matchKey=$1 AND isBlue=$2", a.MatchKey, a.IsBlue)
 	err = row.Scan(&allianceID, &scoreData)
 	if err == sql.ErrNoRows {
-		err := s.db.QueryRow("INSERT INTO alliances (matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id", a.MatchKey, a.IsBlue, a.Score).Scan(&allianceID)
+		err := tx.QueryRow("INSERT INTO alliances (matchKey, isBlue, score) VALUES ($1, $2, $3) RETURNING id", a.MatchKey, a.IsBlue, a.Score).Scan(&allianceID)
 		return allianceID, err
 	} else if err != nil {
 		return 0, err
@@ -594,25 +602,19 @@ func (s *service) upsertAlliance(a store.Alliance) (allianceID int, err error) {
 	} else {
 		score = a.Score
 	}
-	_, err = s.db.Exec("UPDATE alliances SET score=$1 WHERE matchKey=$2 AND isBlue=$3", score, a.MatchKey, a.IsBlue)
+	_, err = tx.Exec("UPDATE alliances SET score=$1 WHERE matchKey=$2 AND isBlue=$3", score, a.MatchKey, a.IsBlue)
 	return allianceID, err
 }
 
 // Modified upsert - null values won't overwrite set ones
-func (s *service) upsertTeamData(d store.TeamInAlliance) error {
+func upsertTeamData(tx *sql.Tx, d store.TeamInAlliance) error {
 	var exists bool
-	row := s.db.QueryRow("SELECT EXISTS (SELECT 1 FROM teamsInAlliance WHERE allianceID=$1 AND number=$2)", d.AllianceID, d.Number)
+	row := tx.QueryRow("SELECT EXISTS (SELECT 1 FROM teamsInAlliance WHERE allianceID=$1 AND number=$2)", d.AllianceID, d.Number)
 	err := row.Scan(&exists)
-	if err == sql.ErrNoRows {
-		_, err = s.db.Exec("INSERT INTO teamsInAlliance (number, allianceID) VALUES ($1, $2)", d.Number, d.AllianceID)
+	if err == sql.ErrNoRows || (!exists && err == nil) {
+		_, err = tx.Exec("INSERT INTO teamsInAlliance (number, allianceID) VALUES ($1, $2)", d.Number, d.AllianceID)
 	}
 	return err
-}
-
-func (s *service) receiveAndUpdateEvents(events <-chan store.Event) {
-	for event := range events {
-		s.db.Exec("INSERT OR REPLACE INTO events (key, name, date) values (?, ?, ?)", event.Key, event.Name, event.Date)
-	}
 }
 
 func (s *service) ensureTableExists(creationQuery string) error {

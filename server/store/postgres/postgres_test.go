@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/server/store"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,24 +33,26 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+var eventCaseKeyInc = &keyInc{}
 var eventCases = []store.Event{
-	store.Event{Key: "", Name: "", Date: time.Unix(10000, 0)},
-	store.Event{Key: "hi-my-key-is-what", Name: "my-name-is-who", Date: time.Unix(10000, 0)},
+	store.Event{Key: eventCaseKeyInc.Next(), Name: "", Date: time.Unix(10000, 0)},
+	store.Event{Key: eventCaseKeyInc.Next(), Name: "my-name-is-who", Date: time.Unix(10000, 0)},
 }
 
-const eventKey = "im-an-event-key"
+var eventKey = eventCaseKeyInc.Next()
 
+var matchCaseKeyInc = &keyInc{}
 var matchCases = []struct {
 	m         store.Match
 	insertErr bool
 	getErr    bool
 }{
-	{store.Match{Key: "im-a-key", EventKey: eventKey, PredictedTime: time.Unix(45678, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "red"}, false, false},
-	{store.Match{Key: "prove-it", EventKey: eventKey, PredictedTime: time.Unix(36573, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "blue"}, false, false},
-	{store.Match{Key: "abcdefgh", EventKey: "i-dont-exist", PredictedTime: time.Unix(36573, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "red"}, true, true},
+	{store.Match{Key: matchCaseKeyInc.Next(), EventKey: eventKey, PredictedTime: time.Unix(45678, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "red"}, false, false},
+	{store.Match{Key: matchCaseKeyInc.Next(), EventKey: eventKey, PredictedTime: time.Unix(36573, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "blue"}, false, false},
+	{store.Match{Key: matchCaseKeyInc.Next(), EventKey: "i-dont-exist", PredictedTime: time.Unix(36573, 0).UTC(), ActualTime: time.Unix(43786, 0).UTC(), WinningAlliance: "red"}, true, true},
 }
 
-const matchKey = "im-an-event-key"
+var matchKey = matchCaseKeyInc.Next()
 
 var allianceCases = []struct {
 	a         store.Alliance
@@ -170,7 +173,7 @@ func TestGetEventAndGetEvents(t *testing.T) {
 	// shhh O(n^2) is fine for testing
 }
 
-func TestCreateEvent(t *testing.T) {
+func TestCreateEventAndUpdateEvents(t *testing.T) {
 	_, err := rawDB.Exec("DELETE FROM events")
 	assert.Equal(t, nil, err, "clearing events table")
 
@@ -187,6 +190,28 @@ func TestCreateEvent(t *testing.T) {
 
 		equality := roughEventEquality(e, c)
 		assert.Equal(t, true, equality, caseString)
+	}
+
+	var updatedEvents []store.Event
+	for _, event := range eventCases {
+		updatedEvents = append(updatedEvents, store.Event{
+			Key: event.Key, Name: event.Name + "a", Date: event.Date.Add(time.Minute)})
+	}
+	// for testing the SERT part of UPSERT
+	updatedEvents = append(updatedEvents, store.Event{
+		Key: eventCaseKeyInc.Next(), Name: "asdf", Date: time.Unix(1000, 0)})
+
+	errs := globalStore.UpdateEvents(updatedEvents)
+	assert.Equal(t, 0, len(errs))
+
+	for _, updatedEvent := range updatedEvents {
+		var dbEvent store.Event
+		err := rawDB.QueryRow("SELECT key, name, date FROM events WHERE key = $1", updatedEvent.Key).Scan(
+			&dbEvent.Key, &dbEvent.Name, &dbEvent.Date)
+		assert.Equal(t, nil, err)
+
+		equality := roughEventEquality(updatedEvent, dbEvent)
+		assert.Equal(t, true, equality)
 	}
 }
 
@@ -270,7 +295,7 @@ func TestCheckMatchExistence(t *testing.T) {
 	assert.Equal(t, false, exists, "CheckMatchExistence found non-existent match")
 }
 
-func TestCreateMatchAndUpdateMatch(t *testing.T) {
+func TestCreateMatchAndUpdateMatches(t *testing.T) {
 	err := clearTables("matches", "events")
 	assert.Equal(t, nil, err, "clearing tables")
 
@@ -293,10 +318,37 @@ func TestCreateMatchAndUpdateMatch(t *testing.T) {
 
 		assert.Equal(t, c.m, m, caseString)
 	}
+
+	var updatedMatches []store.Match
+	for _, match := range matchCases {
+		updatedMatches = append(updatedMatches, store.Match{
+			Key: match.m.Key, EventKey: eventKey, PredictedTime: match.m.PredictedTime.Add(time.Hour), WinningAlliance: "red",
+			BlueAlliance: store.Alliance{MatchKey: match.m.Key, IsBlue: true, Score: 2733,
+				Teams: []store.TeamInAlliance{store.TeamInAlliance{Number: "frc2733b"}}},
+			RedAlliance: store.Alliance{MatchKey: match.m.Key, IsBlue: false, Score: 0000},
+		})
+	}
+	// for testing the SERT part of UPSERT
+	updatedMatches = append(updatedMatches, store.Match{
+		Key: "frc2733TheBest", EventKey: eventKey, WinningAlliance: "green",
+		BlueAlliance: store.Alliance{MatchKey: "frc2733TheBest", IsBlue: true, Score: 656},
+		RedAlliance:  store.Alliance{MatchKey: "frc2733TheBest", IsBlue: false, Score: 421}})
+
+	errs := globalStore.UpdateMatches(updatedMatches)
+	assert.Equal(t, 0, len(errs))
+
+	for _, updatedMatch := range updatedMatches {
+		var dbMatch store.Match
+		dbMatch, err := retrieveCompleteMatch(updatedMatch.EventKey, updatedMatch.Key)
+		assert.Equal(t, nil, err)
+
+		equality := reflect.DeepEqual(updatedMatch, dbMatch)
+		assert.Equal(t, true, equality)
+	}
 }
 
 func TestGetAlliance(t *testing.T) {
-	err := clearTables("alliances", "matches", "events")
+	err := clearTables("teamsInAlliance", "alliances", "matches", "events")
 	assert.Equal(t, nil, err, "clearing tables")
 
 	_, err = rawDB.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
@@ -328,7 +380,7 @@ func TestGetAlliance(t *testing.T) {
 }
 
 func TestCreateAllianceAndUpdateAlliance(t *testing.T) {
-	err := clearTables("alliances", "matches", "events")
+	err := clearTables("teamsInAlliance", "alliances", "matches", "events")
 	assert.Equal(t, nil, err, "clearing tables")
 
 	_, err = rawDB.Exec("INSERT INTO events VALUES ($1, $2, $3)", eventKey, "", time.Unix(10000, 0))
@@ -370,7 +422,7 @@ func TestCreateAllianceAndUpdateAlliance(t *testing.T) {
 }
 
 func TestCreateReportAndUpdateReport(t *testing.T) {
-	err := clearTables("reports", "alliances", "matches", "events")
+	err := clearTables("reports", "teamsInAlliance", "alliances", "matches", "events")
 	assert.Equal(t, nil, err, "clearing tables")
 
 	var eventKeyInc keyInc
@@ -588,4 +640,90 @@ func TestCreateTeamInAlliance(t *testing.T) {
 	err = row.Scan(&actualTeam.Number, &actualTeam.AllianceID, &actualTeam.PredictedContribution, &actualTeam.ActualContribution)
 	assert.Equal(t, nil, err, "testing if CreateTeamInAlliance actually created team failed")
 	assert.Equal(t, expectedTeam, actualTeam, "testing if CreateTeamInAlliance created correct team failed")
+}
+
+func retrieveCompleteMatch(eventKey string, matchKey string) (store.Match, error) {
+	row := rawDB.QueryRow("SELECT key, eventKey, predictedTime, actualTime, winningAlliance FROM matches WHERE eventKey=$1 AND key=$2", eventKey, matchKey)
+	var m store.Match
+	var predictedTime pq.NullTime
+	var actualTime pq.NullTime
+	var winningAlliance sql.NullString
+	if err := row.Scan(&m.Key, &m.EventKey, &predictedTime, &actualTime, &winningAlliance); err != nil {
+		return m, err
+	}
+	if !predictedTime.Valid {
+		m.PredictedTime = time.Time{}
+	} else {
+		m.PredictedTime = predictedTime.Time.UTC()
+	}
+	if !actualTime.Valid {
+		m.ActualTime = time.Time{}
+	} else {
+		m.ActualTime = actualTime.Time.UTC()
+	}
+	if !winningAlliance.Valid {
+		m.WinningAlliance = ""
+	} else {
+		m.WinningAlliance = winningAlliance.String
+	}
+	redAlliance := store.Alliance{MatchKey: matchKey, IsBlue: false}
+	var redID int
+	row = rawDB.QueryRow("SELECT id, score FROM alliances WHERE matchKey=$1 AND isBlue=$2", matchKey, false)
+	err := row.Scan(&redID, &redAlliance.Score)
+	if err != sql.ErrNoRows && err != nil {
+		return m, err
+	}
+	if err == nil {
+		rows, err := rawDB.Query("SELECT number, predictedContribution, actualContribution FROM teamsInAlliance WHERE allianceID=$1", redID)
+		if err != nil {
+			return m, err
+		}
+		for rows.Next() {
+			var team store.TeamInAlliance
+			var predictedContribution sql.NullString
+			var actualContribution sql.NullString
+			if err := rows.Scan(&team.Number, &predictedContribution, &actualContribution); err != nil {
+				return m, err
+			}
+			if predictedContribution.Valid {
+				team.PredictedContribution = predictedContribution.String
+			}
+			if actualContribution.Valid {
+				team.ActualContribution = actualContribution.String
+			}
+			redAlliance.Teams = append(redAlliance.Teams, team)
+		}
+		m.RedAlliance = redAlliance
+	}
+
+	blueAlliance := store.Alliance{MatchKey: matchKey, IsBlue: true}
+	var blueID int
+	row = rawDB.QueryRow("SELECT id, score FROM alliances WHERE matchKey=$1 AND isBlue=$2", matchKey, true)
+	err = row.Scan(&blueID, &blueAlliance.Score)
+	if err != sql.ErrNoRows && err != nil {
+		return m, err
+	}
+	if err == nil {
+		rows, err := rawDB.Query("SELECT number, predictedContribution, actualContribution FROM teamsInAlliance WHERE allianceID=$1", blueID)
+		if err != nil {
+			return m, err
+		}
+		for rows.Next() {
+			var team store.TeamInAlliance
+			var predictedContribution sql.NullString
+			var actualContribution sql.NullString
+			if err := rows.Scan(&team.Number, &predictedContribution, &actualContribution); err != nil {
+				return m, err
+			}
+			if predictedContribution.Valid {
+				team.PredictedContribution = predictedContribution.String
+			}
+			if actualContribution.Valid {
+				team.ActualContribution = actualContribution.String
+			}
+			blueAlliance.Teams = append(blueAlliance.Teams, team)
+		}
+		m.BlueAlliance = blueAlliance
+	}
+	return m, nil
 }
