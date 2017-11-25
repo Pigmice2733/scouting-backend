@@ -95,15 +95,16 @@ type service struct {
 
 // Options holds information for connecting to a postgres instance
 type Options struct {
-	User, Pass string
-	Host       string
-	Port       int
-	DBName     string
-	SSLMode    string
+	User, Pass       string
+	Host             string
+	Port             int
+	DBName           string
+	SSLMode          string
+	StatementTimeout int
 }
 
 func (o Options) connectionInfo() string {
-	return fmt.Sprintf("host='%s' port='%d' user='%s' password='%s' dbname='%s' sslmode='%s'", o.Host, o.Port, o.User, o.Pass, o.DBName, o.SSLMode)
+	return fmt.Sprintf("host='%s' port='%d' user='%s' password='%s' dbname='%s' sslmode='%s' statement_timeout=%d", o.Host, o.Port, o.User, o.Pass, o.DBName, o.SSLMode, o.StatementTimeout)
 }
 
 // NewFromOptions creates a new storage service from provided connection options

@@ -16,9 +16,11 @@ import (
 var globalStore store.Service
 var rawDB *sql.DB
 
+var options = Options{User: os.Getenv("POSTGRES_1_ENV_POSTGRES_USER"), Pass: os.Getenv("POSTGRES_1_ENV_POSTGRES_PASSWORD"), Host: os.Getenv("POSTGRES_1_PORT_5432_TCP_ADDR"), Port: 5432, DBName: os.Getenv("POSTGRES_1_ENV_POSTGRES_DB"), SSLMode: "disable", StatementTimeout: 5000}
+
 func TestMain(m *testing.M) {
 	var err error
-	globalStore, err = NewFromOptions(Options{User: os.Getenv("POSTGRES_1_ENV_POSTGRES_USER"), Pass: os.Getenv("POSTGRES_1_ENV_POSTGRES_PASSWORD"), Host: os.Getenv("POSTGRES_1_PORT_5432_TCP_ADDR"), Port: 5432, DBName: os.Getenv("POSTGRES_1_ENV_POSTGRES_DB"), SSLMode: "disable"})
+	globalStore, err = NewFromOptions(options)
 	if err != nil {
 		fmt.Printf("error connecting to database: %v\n", err)
 		os.Exit(1)
