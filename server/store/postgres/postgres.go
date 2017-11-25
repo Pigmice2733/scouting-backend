@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS users
 `
 
 type service struct {
-	db *sql.DB
+	db             *sql.DB
+	maxConnections int
 }
 
 // Options holds information for connecting to a postgres instance
@@ -100,6 +101,7 @@ type Options struct {
 	Port             int
 	DBName           string
 	SSLMode          string
+	MaxConnections   int
 	StatementTimeout int
 }
 
@@ -109,7 +111,17 @@ func (o Options) connectionInfo() string {
 
 // NewFromOptions creates a new storage service from provided connection options
 func NewFromOptions(options Options) (store.Service, error) {
+	if options.MaxConnections <= 0 {
+		return nil, fmt.Errorf("postgres MaxConnections is set to '%v', it must be greater than zero", options.MaxConnections)
+	}
+
 	db, err := sql.Open("postgres", options.connectionInfo())
+	if err != nil {
+		return nil, err
+	}
+
+	// Limit max connections. Requests for additional connections will just block till one is available
+	db.SetMaxOpenConns(options.MaxConnections)
 
 	if _, err := db.Exec(eventTableCreationQuery); err != nil {
 		return nil, err
@@ -133,12 +145,13 @@ func NewFromOptions(options Options) (store.Service, error) {
 		return nil, err
 	}
 
-	return &service{db}, err
+	return &service{db, options.MaxConnections}, err
 }
 
 // New returns a new storage service for postgres
+// Sets maximum connections to postgres default of 100
 func New(db *sql.DB) store.Service {
-	return &service{db}
+	return &service{db, 100}
 }
 
 func (s *service) CreateEvent(e store.Event) error {
@@ -162,14 +175,9 @@ func (s *service) GetEvent(key string) (store.Event, error) {
 
 func (s *service) GetEvents() ([]store.Event, error) {
 	rows, err := s.db.Query("SELECT key, name, date FROM events")
-
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, store.ErrNoResults
-		}
 		return nil, err
 	}
-
 	defer rows.Close()
 
 	events := []store.Event{}
@@ -186,14 +194,27 @@ func (s *service) GetEvents() ([]store.Event, error) {
 }
 
 func (s *service) UpdateEvents(events []store.Event) []error {
-	errorQueue := make(chan error)
+	errorQueue := make(chan error, len(events))
+	eventQueue := make(chan store.Event)
+
+	maxHandlers := s.maxConnections - 2
+	if maxHandlers < 1 {
+		maxHandlers = 1
+	}
+
+	for i := 0; i < maxHandlers; i++ {
+		go func() {
+			for e := range eventQueue {
+				_, err := s.db.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3) ON CONFLICT (key) DO UPDATE SET name = $2, date = $3", e.Key, e.Name, e.Date)
+				errorQueue <- err
+			}
+		}()
+	}
 
 	for _, event := range events {
-		go func(e store.Event) {
-			_, err := s.db.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3) ON CONFLICT (key) DO UPDATE SET name = $2, date = $3", e.Key, e.Name, e.Date)
-			errorQueue <- err
-		}(event)
+		eventQueue <- event
 	}
+	close(eventQueue)
 
 	var errors []error
 	for i := 0; i < len(events); i++ {
@@ -260,14 +281,9 @@ func (s *service) GetMatch(eventKey, key string) (store.Match, error) {
 
 func (s *service) GetAllMatchData(eventKey string) ([]store.Match, error) {
 	rows, err := s.db.Query("SELECT key, eventKey, predictedTime, actualTime, winningAlliance FROM matches WHERE eventKey=$1", eventKey)
-
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, store.ErrNoResults
-		}
 		return nil, err
 	}
-
 	defer rows.Close()
 
 	matches := []store.Match{}
@@ -344,13 +360,26 @@ func (s *service) GetAllMatchData(eventKey string) ([]store.Match, error) {
 }
 
 func (s *service) UpdateMatches(matches []store.Match) []error {
-	errorQueue := make(chan error)
+	errorQueue := make(chan error, len(matches))
+	matchQueue := make(chan store.Match)
+
+	maxHandlers := s.maxConnections - 5
+	if maxHandlers < 1 {
+		maxHandlers = 1
+	}
+
+	for i := 0; i < maxHandlers; i++ {
+		go func() {
+			for m := range matchQueue {
+				errorQueue <- s.upsertMatch(m)
+			}
+		}()
+	}
 
 	for _, match := range matches {
-		go func(match store.Match) {
-			errorQueue <- s.upsertMatch(match)
-		}(match)
+		matchQueue <- match
 	}
+	close(matchQueue)
 
 	var errors []error
 	for i := 0; i < len(matches); i++ {
@@ -401,7 +430,7 @@ func (s *service) UpdateReport(r store.ReportData, allianceID int) error {
 }
 
 func (s *service) EventsModifiedData() (string, error) {
-	row := s.db.QueryRow("SELECT lastModified FROM tbaModified WHERE name=\"events\"")
+	row := s.db.QueryRow("SELECT lastModified FROM tbaModified WHERE name='events'")
 
 	var lastModified string
 	if err := row.Scan(&lastModified); err != nil {
@@ -416,11 +445,11 @@ func (s *service) EventsModifiedData() (string, error) {
 func (s *service) SetEventsModifiedData(lastModified string) error {
 	_, err := s.EventsModifiedData()
 	if err == sql.ErrNoRows {
-		_, err = s.db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES (\"events\", $1)", lastModified)
+		_, err = s.db.Exec("INSERT INTO tbaModified(name, lastModified) VALUES ('events', $1)", lastModified)
 		return err
 	}
 
-	_, err = s.db.Exec("UPDATE tbaModified SET lastModified=$1 WHERE name=\"events\"", lastModified)
+	_, err = s.db.Exec("UPDATE tbaModified SET lastModified=$1 WHERE name='events'", lastModified)
 	return err
 }
 
@@ -459,9 +488,6 @@ func (s *service) GetUsers() ([]store.User, error) {
 
 	rows, err := s.db.Query("SELECT username, hashedPassword FROM users")
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return users, store.ErrNoResults
-		}
 		return users, err
 	}
 	defer rows.Close()
@@ -495,6 +521,7 @@ func (s *service) GetTeamsInAlliance(allianceID int) ([]store.TeamInAlliance, er
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var team store.TeamInAlliance
@@ -520,6 +547,10 @@ func (s *service) CreateTeamInAlliance(allianceID int, team store.TeamInAlliance
 	_, err := s.db.Exec("INSERT INTO teamsInAlliance(number, allianceID, predictedContribution, actualContribution) VALUES ($1, $2, $3, $4)",
 		team.Number, allianceID, team.PredictedContribution, team.ActualContribution)
 	return err
+}
+
+func (s *service) Close() error {
+	return s.db.Close()
 }
 
 func (s *service) upsertMatch(match store.Match) error {

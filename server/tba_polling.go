@@ -22,7 +22,7 @@ func (s *Server) pollTBAEvents(tbaAPI string, apikey string, year string) error 
 
 	req, err := http.NewRequest("GET", eventsEndpoint, nil)
 	if err != nil {
-		return fmt.Errorf("error: TBA polling failed: %v", err)
+		return fmt.Errorf("TBA polling failed: %v", err)
 	}
 
 	lastModified, err := s.store.EventsModifiedData()
@@ -36,7 +36,7 @@ func (s *Server) pollTBAEvents(tbaAPI string, apikey string, year string) error 
 	response, err := client.Do(req)
 
 	if err != nil {
-		return fmt.Errorf("error: TBA polling request failed: %v", err)
+		return fmt.Errorf("TBA polling request failed: %v", err)
 	}
 
 	lastModified = response.Header.Get("Last-Modified")
@@ -56,7 +56,7 @@ func (s *Server) pollTBAEvents(tbaAPI string, apikey string, year string) error 
 	}
 
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1.049e+6)).Decode(&tbaEvents); err != nil {
-		return fmt.Errorf("error: reading TBA response: %v", err)
+		return fmt.Errorf("reading TBA response: %v", err)
 	}
 
 	var events []store.Event

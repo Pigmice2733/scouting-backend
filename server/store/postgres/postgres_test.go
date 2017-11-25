@@ -16,7 +16,7 @@ import (
 var globalStore store.Service
 var rawDB *sql.DB
 
-var options = Options{User: os.Getenv("POSTGRES_1_ENV_POSTGRES_USER"), Pass: os.Getenv("POSTGRES_1_ENV_POSTGRES_PASSWORD"), Host: os.Getenv("POSTGRES_1_PORT_5432_TCP_ADDR"), Port: 5432, DBName: os.Getenv("POSTGRES_1_ENV_POSTGRES_DB"), SSLMode: "disable", StatementTimeout: 5000}
+var options = Options{User: os.Getenv("POSTGRES_1_ENV_POSTGRES_USER"), Pass: os.Getenv("POSTGRES_1_ENV_POSTGRES_PASSWORD"), Host: os.Getenv("POSTGRES_1_PORT_5432_TCP_ADDR"), Port: 5432, DBName: os.Getenv("POSTGRES_1_ENV_POSTGRES_DB"), SSLMode: "disable", MaxConnections: 60, StatementTimeout: 5000}
 
 func TestMain(m *testing.M) {
 	var err error
@@ -676,15 +676,16 @@ func retrieveCompleteMatch(eventKey string, matchKey string) (store.Match, error
 		return m, err
 	}
 	if err == nil {
-		rows, err := rawDB.Query("SELECT number, predictedContribution, actualContribution FROM teamsInAlliance WHERE allianceID=$1", redID)
+		redAllianceTeams, err := rawDB.Query("SELECT number, predictedContribution, actualContribution FROM teamsInAlliance WHERE allianceID=$1", redID)
 		if err != nil {
 			return m, err
 		}
-		for rows.Next() {
+		defer redAllianceTeams.Close()
+		for redAllianceTeams.Next() {
 			var team store.TeamInAlliance
 			var predictedContribution sql.NullString
 			var actualContribution sql.NullString
-			if err := rows.Scan(&team.Number, &predictedContribution, &actualContribution); err != nil {
+			if err := redAllianceTeams.Scan(&team.Number, &predictedContribution, &actualContribution); err != nil {
 				return m, err
 			}
 			if predictedContribution.Valid {
@@ -706,15 +707,16 @@ func retrieveCompleteMatch(eventKey string, matchKey string) (store.Match, error
 		return m, err
 	}
 	if err == nil {
-		rows, err := rawDB.Query("SELECT number, predictedContribution, actualContribution FROM teamsInAlliance WHERE allianceID=$1", blueID)
+		blueAllianceTeams, err := rawDB.Query("SELECT number, predictedContribution, actualContribution FROM teamsInAlliance WHERE allianceID=$1", blueID)
 		if err != nil {
 			return m, err
 		}
-		for rows.Next() {
+		defer blueAllianceTeams.Close()
+		for blueAllianceTeams.Next() {
 			var team store.TeamInAlliance
 			var predictedContribution sql.NullString
 			var actualContribution sql.NullString
-			if err := rows.Scan(&team.Number, &predictedContribution, &actualContribution); err != nil {
+			if err := blueAllianceTeams.Scan(&team.Number, &predictedContribution, &actualContribution); err != nil {
 				return m, err
 			}
 			if predictedContribution.Valid {

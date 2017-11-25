@@ -66,7 +66,7 @@ func New(store store.Service, logWriter io.Writer, tbaAPIKey string, environment
 
 // Run starts a running the server on the specified address
 func (s *Server) Run(addr string) error {
-	s.logger.Infof("server up and running")
+	s.logger.Infof("Starting server at: %s", addr)
 	return http.ListenAndServe(addr, s.Handler)
 }
 
@@ -90,8 +90,6 @@ func (s *Server) initializeRouter() {
 	router.Handle("/events/{eventKey}/{matchKey}/{team}", s.authHandler(http.HandlerFunc(s.updateReport))).Methods("PUT")
 
 	s.Handler = router
-
-	s.logger.Infof("initialized router...")
 }
 
 func (s *Server) initializeMiddlewares() {

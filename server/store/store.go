@@ -34,6 +34,7 @@ type Service interface {
 	DeleteUser(username string) error
 	GetTeamsInAlliance(allianceID int) ([]TeamInAlliance, error)
 	CreateTeamInAlliance(allianceID int, team TeamInAlliance) error
+	Close() error
 }
 
 // Event holds data from TBA about an event
