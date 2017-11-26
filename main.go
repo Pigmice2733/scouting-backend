@@ -63,14 +63,14 @@ func main() {
 
 func dbOptions(environment string) (postgres.Options, error) {
 	if strings.ToLower(environment) == "staging" {
-		rawConnectionURL, valid := os.LookupEnv("DATABASE_URL")
+		rawConnectionURL, valid := os.LookupEnv("POSTGRES_URL")
 		if !valid {
-			return postgres.Options{}, fmt.Errorf("staging missing valid DATABASE_URL for PostgreSQL connection")
+			return postgres.Options{}, fmt.Errorf("staging missing valid POSTGRES_URL for PostgreSQL connection")
 		}
 
 		connectionURL, err := url.Parse(rawConnectionURL)
 		if err != nil {
-			return postgres.Options{}, fmt.Errorf("staging environment variable DATABASE_URL does not contain valid connection info")
+			return postgres.Options{}, fmt.Errorf("staging environment variable POSTGRES_URL does not contain valid connection info")
 		}
 
 		user := connectionURL.User.Username()
@@ -81,7 +81,7 @@ func dbOptions(environment string) (postgres.Options, error) {
 
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
-			return postgres.Options{}, fmt.Errorf("staging DATABASE_URL must contain valid port number")
+			return postgres.Options{}, fmt.Errorf("staging POSTGRES_URL must contain valid port number")
 		}
 
 		maxConnections, err := getMaxConnections()
