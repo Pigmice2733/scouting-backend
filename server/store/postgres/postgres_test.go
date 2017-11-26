@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"testing"
@@ -19,6 +20,16 @@ var rawDB *sql.DB
 var options = Options{User: os.Getenv("POSTGRES_1_ENV_POSTGRES_USER"), Pass: os.Getenv("POSTGRES_1_ENV_POSTGRES_PASSWORD"), Host: os.Getenv("POSTGRES_1_PORT_5432_TCP_ADDR"), Port: 5432, DBName: os.Getenv("POSTGRES_1_ENV_POSTGRES_DB"), SSLMode: "disable", MaxConnections: 60, StatementTimeout: 5000}
 
 func TestMain(m *testing.M) {
+	setup()
+	code := m.Run()
+	connectionsClosed := teardown()
+	if !connectionsClosed {
+		os.Exit(1)
+	}
+	os.Exit(code)
+}
+
+func setup() {
 	var err error
 	globalStore, err = NewFromOptions(options)
 	if err != nil {
@@ -28,11 +39,36 @@ func TestMain(m *testing.M) {
 
 	if s, ok := globalStore.(*service); ok {
 		rawDB = s.db
+		rawDB.SetMaxOpenConns(20)
+		rawDB.SetMaxIdleConns(0)
 	} else {
 		fmt.Printf("error getting underlying service: %v\n", err)
 	}
+}
 
-	os.Exit(m.Run())
+func teardown() bool {
+	closed := checkConnections()
+
+	err := globalStore.Close()
+	if err != nil {
+		log.Panicf("error closing db connection %v", err)
+	}
+	rawDB = nil
+	return closed
+}
+
+func checkConnections() bool {
+	time.Sleep(time.Millisecond)
+	if rawDB == nil {
+		// DB connection failed
+		return true
+	}
+	open := rawDB.Stats().OpenConnections
+	if open > 0 {
+		fmt.Printf("tests failed to close %d connections\n", open)
+		return false
+	}
+	return true
 }
 
 var eventCaseKeyInc = &keyInc{}
