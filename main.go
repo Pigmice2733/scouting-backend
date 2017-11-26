@@ -3,11 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
-	"net/url"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/Pigmice2733/scouting-backend/server"
 	"github.com/Pigmice2733/scouting-backend/server/store/postgres"
@@ -62,73 +59,30 @@ func main() {
 }
 
 func dbOptions(environment string) (postgres.Options, error) {
-	if strings.ToLower(environment) == "staging" {
-		rawConnectionURL, valid := os.LookupEnv("POSTGRES_URL")
-		if !valid {
-			return postgres.Options{}, fmt.Errorf("staging missing valid POSTGRES_URL for PostgreSQL connection")
-		}
-
-		connectionURL, err := url.Parse(rawConnectionURL)
-		if err != nil {
-			return postgres.Options{}, fmt.Errorf("staging environment variable POSTGRES_URL does not contain valid connection info")
-		}
-
-		user := connectionURL.User.Username()
-		password, _ := connectionURL.User.Password()
-		host, portStr, err := net.SplitHostPort(connectionURL.Host)
-		dbName := connectionURL.Path[1:]
-		sslMode, validSSLMode := os.LookupEnv("POSTGRES_SSL")
-		if !validSSLMode {
-			return postgres.Options{}, fmt.Errorf("staging missing environment variable POSTGRES_SSL specifying SSL mode")
-		}
-
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return postgres.Options{}, fmt.Errorf("staging POSTGRES_URL must contain valid port number")
-		}
-
-		maxConnections, err := getMaxConnections()
-		if err != nil {
-			return postgres.Options{}, err
-		}
-
-		return postgres.Options{User: user, Pass: password, Host: host, Port: port, DBName: dbName, SSLMode: sslMode, MaxConnections: maxConnections, StatementTimeout: 5000}, nil
-	} else if strings.ToLower(environment) == "production" {
-		user, validUser := os.LookupEnv("POSTGRES_USER")
-		password, validPass := os.LookupEnv("POSTGRES_PASSWORD")
-		host, validHost := os.LookupEnv("DATABASE_URL")
-		portStr, validPort := os.LookupEnv("POSTGRES_PORT")
-		dbName, validDBName := os.LookupEnv("POSTGRES_DB")
-		sslMode, validSSLMode := os.LookupEnv("POSTGRES_SSL")
-
-		if !validUser || !validPass || !validHost || !validPort || !validDBName || !validSSLMode {
-			return postgres.Options{}, fmt.Errorf("production environment missing required environment variables for PostgreSQL database")
-		}
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return postgres.Options{}, fmt.Errorf("production environment must contain valid 'POSTGRES_PORT' number")
-		}
-
-		maxConnections, err := getMaxConnections()
-		if err != nil {
-			return postgres.Options{}, err
-		}
-
-		return postgres.Options{User: user, Pass: password, Host: host, Port: port, DBName: dbName, SSLMode: sslMode, MaxConnections: maxConnections, StatementTimeout: 5000}, nil
+	maxConnections, err := strconv.Atoi(os.Getenv("MAX_DB_CONNECTIONS"))
+	if err != nil {
+		return postgres.Options{}, fmt.Errorf("error parsing MAX_DB_CONNECTIONS: %v\n", err)
 	}
-	return postgres.Options{}, fmt.Errorf("environment '%s' not supported", environment)
-}
 
-func getMaxConnections() (int, error) {
-	maxConnectionsStr, valid := os.LookupEnv("MAX_DB_CONNECTIONS")
-	if valid {
-		maxConnections, err := strconv.Atoi(maxConnectionsStr)
-		if err != nil {
-			return maxConnections, fmt.Errorf("MAX_DB_CONNECTIONS environment variable contains invalid connection number")
-		}
-		return maxConnections, nil
+	const defaultMaxConnections = 32
+	if maxConnections < 1 {
+		log.Printf("MAX_DB_CONNECTIONS must be >= 1, defaulting to %d\n", defaultMaxConnections)
+		maxConnections = defaultMaxConnections
 	}
-	defaultMax := 60
-	log.Printf("MAX_DB_CONNECTIONS should contain maximum database connections. Using default %v\n", defaultMax)
-	return defaultMax, nil
+
+	port, err := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
+	if err != nil {
+		return postgres.Options{}, fmt.Errorf("error parsing POSTGRES_PORT: %v\n", err)
+	}
+
+	return postgres.Options{
+		User:             os.Getenv("POSTGRES_USER"),
+		Pass:             os.Getenv("POSTGRES_PASS"),
+		Host:             os.Getenv("POSTGRES_HOST"),
+		Port:             port,
+		DBName:           os.Getenv("POSTGRES_DBNAME"),
+		SSLMode:          os.Getenv("POSTGRES_SSLMODE"),
+		MaxConnections:   maxConnections,
+		StatementTimeout: 5000,
+	}, nil
 }
