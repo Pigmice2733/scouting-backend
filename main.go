@@ -77,7 +77,10 @@ func dbOptions(environment string) (postgres.Options, error) {
 		password, _ := connectionURL.User.Password()
 		host, portStr, err := net.SplitHostPort(connectionURL.Host)
 		dbName := connectionURL.Path[1:]
-		sslMode := "require"
+		sslMode, validSSLMode := os.LookupEnv("POSTGRES_SSL")
+		if !validSSLMode {
+			return postgres.Options{}, fmt.Errorf("staging missing environment variable POSTGRES_SSL specifying SSL mode")
+		}
 
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
