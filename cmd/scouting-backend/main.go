@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/Pigmice2733/scouting-backend/server"
-	"github.com/Pigmice2733/scouting-backend/server/store/postgres"
+	"github.com/Pigmice2733/scouting-backend/internal/server"
+	"github.com/Pigmice2733/scouting-backend/internal/store/postgres"
 )
 
 func main() {

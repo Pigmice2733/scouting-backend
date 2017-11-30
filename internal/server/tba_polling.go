@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Pigmice2733/scouting-backend/server/store"
+	"github.com/Pigmice2733/scouting-backend/internal/store"
 )
 
 func (s *Server) pollTBAEvents(tbaAPI string, apikey string, year string) error {

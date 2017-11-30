@@ -15,8 +15,8 @@ import (
 	"context"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/Pigmice2733/scouting-backend/server/logger"
-	"github.com/Pigmice2733/scouting-backend/server/store"
+	"github.com/Pigmice2733/scouting-backend/internal/logger"
+	"github.com/Pigmice2733/scouting-backend/internal/store"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/didip/tollbooth"
 	"github.com/gorilla/mux"

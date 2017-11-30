@@ -3,8 +3,8 @@
 *.dll
 *.so
 *.dylib
-scouting-backend
 
+cmd/scouting-backend/scouting-backend
 # Database
 *.db
 

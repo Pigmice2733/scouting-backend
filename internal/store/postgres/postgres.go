@@ -7,7 +7,7 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/Pigmice2733/scouting-backend/server/store"
+	"github.com/Pigmice2733/scouting-backend/internal/store"
 )
 
 const eventTableCreationQuery = `

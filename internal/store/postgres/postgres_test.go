@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Pigmice2733/scouting-backend/server/store"
+	"github.com/Pigmice2733/scouting-backend/internal/store"
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )

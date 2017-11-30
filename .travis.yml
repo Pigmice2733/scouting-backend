@@ -16,4 +16,4 @@ matrix:
   fast_finish: true
 
 script:
-  - sh ./test.sh
+  - sh scripts/test.sh "$TRAVIS_BUILD_DIR/compose-testing.yml"
