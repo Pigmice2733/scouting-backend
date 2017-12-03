@@ -122,5 +122,10 @@
 			"revisionTime": "2017-11-18T22:44:42Z"
 		}
 	],
-	"rootPath": "github.com/Pigmice2733/scouting-backend"
+	"rootPath": "github.com/Pigmice2733/scouting-backend",
+	"heroku": {
+		"install": [
+			"./cmd/scouting-backend"
+		]
+	}
 }
