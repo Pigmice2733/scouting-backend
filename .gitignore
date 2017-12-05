@@ -1,12 +1,6 @@
-# Binaries for programs and plugins
-*.exe
-*.dll
-*.so
-*.dylib
-
-cmd/scouting-backend/scouting-backend
-# Database
-*.db
+# Binaries
+/cmd/scouting-backend/scouting-backend
+/cmd/scouting-backend/scouting-backend.exe
 
 # Govendor
 /vendor/**/

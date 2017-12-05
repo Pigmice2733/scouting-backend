@@ -1,73 +1,41 @@
 package logger
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"time"
 )
 
-const (
-	infoPrefix  = "[INFO]"
-	debugPrefix = "[DEBUG]"
-	errorPrefix = "[ERROR]"
-)
-
-// Service is provided for writing log messages to an io.Writer interface
+// Service is a struct for logging to a specified writer.
 type Service struct {
-	logger   *log.Logger
-	settings Settings
+	out         io.Writer
+	jsonEncoder *json.Encoder
 }
 
-// Settings holds the settings for what log messages to print
-type Settings struct {
-	Info  bool
-	Debug bool
-	Error bool
+// New creates a new logging service for logging to the specified output.
+func New(out io.Writer) Service {
+	return Service{out: out, jsonEncoder: json.NewEncoder(out)}
 }
 
-// New creates a new service for logging given an io.Writer to write log messages to
-func New(out io.Writer, settings Settings) Service {
-	return Service{logger: log.New(out, "", log.LstdFlags), settings: settings}
+// Logf allows you to log to output with printf-style logging. Prefer
+// structured logging (LogJSON) to this.
+func (l *Service) Logf(format string, a ...interface{}) (n int, err error) {
+	return fmt.Fprintf(l.out, format, a...)
 }
 
-// Middleware wraps an HTTP handler to log information about
-// the request such as the method, URI, name, and time to complete
-func (s Service) Middleware(inner http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-
-		inner.ServeHTTP(w, r)
-
-		s.Debugf(
-			"%-8s%s%d",
-			r.Method,
-			r.URL,
-			time.Since(start),
-		)
-	})
+// LogJSON allows you to make strucutured logs written to the output after
+// being json encoded. Prefer this to non structured logging (Logf).
+func (l *Service) LogJSON(info map[string]interface{}) error {
+	return l.jsonEncoder.Encode(info)
 }
 
-// Infof will print to the io.Writer if Info is enabled with the
-// prefix '[INFO]'
-func (s Service) Infof(format string, a ...interface{}) {
-	if s.settings.Info {
-		s.logger.Printf(infoPrefix+" "+format, a...)
+// LogRequestJSON makes json encoded structured logs by using LogJSON, but
+// adds information about a request (path, method) to the log.
+func (l *Service) LogRequestJSON(r *http.Request, inf map[string]interface{}) error {
+	reqLog := map[string]interface{}{"path": r.URL.Path, "method": r.Method}
+	for k, v := range inf {
+		reqLog[k] = v
 	}
-}
-
-// Debugf will print to the io.Writer if Debug is enabled with the
-// prefix '[DEBUG]'
-func (s Service) Debugf(format string, a ...interface{}) {
-	if s.settings.Debug {
-		s.logger.Printf(debugPrefix+" "+format, a...)
-	}
-}
-
-// Errorf will print to the io.Writer if Error is enabled with the
-// prefix '[ERROR]'
-func (s Service) Errorf(format string, a ...interface{}) {
-	if s.settings.Error {
-		s.logger.Printf(errorPrefix+" "+format, a...)
-	}
+	return l.LogJSON(reqLog)
 }

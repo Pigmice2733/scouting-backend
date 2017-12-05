@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
@@ -10,79 +9,52 @@ import (
 	"github.com/Pigmice2733/scouting-backend/internal/store/postgres"
 )
 
+// ENVIRONMENT VARIABLES:
+// PG_USER: postgres user
+// PG_PASS: postgres password
+// PG_HOST: postgres host address
+// PG_PORT: postgres port
+// PG_DB_NAME: postgres database name
+// PG_SSL_MODE: postgres ssl mode
+// PG_MAX_CONNECTIONS: postgres maximum connections
+// TBA_API_KEY: the blue alliance api key
+// PORT: port to listen on
+
 func main() {
-	log.Println("Starting backend")
-	tbaAPIKey, valid := os.LookupEnv("TBA_API_KEY")
-	if !valid {
-		log.Println("Valid TBA API key must be provided in environment variable 'TBA_API_KEY'")
-	}
-
-	port, valid := os.LookupEnv("PORT")
-	if !valid {
-		port = "8080"
-	}
-
-	environment, valid := os.LookupEnv("ENVIRONMENT")
-	if !valid {
-		environment = "dev"
-	}
-
-	postgresOptions, err := dbOptions(environment)
+	port, err := strconv.Atoi(os.Getenv("PG_PORT"))
 	if err != nil {
-		log.Printf("error getting connection info for PostgreSQL: '%v'\n", err)
-		return
+		fmt.Printf("unable to parse 'PG_PORT': %v\n", err)
+		os.Exit(1)
 	}
 
-	store, err := postgres.NewFromOptions(postgresOptions)
-	if err != nil {
-		log.Printf("error: connecting to database: %v\n", err)
-		return
-	}
-	defer store.Close()
-	log.Println("Connected to database")
-
-	server, err := server.New(store, os.Stdout, tbaAPIKey, environment)
-	if err != nil {
-		log.Printf("error creating server: %v\n", err)
-		return
-	}
-	log.Println("Created server")
-
-	if err := server.PollTBA("2017"); err != nil {
-		log.Printf("error polling TBA: %v\n", err)
-	}
-
-	if err := server.Run(":" + port); err != nil {
-		store.Close()
-		log.Fatalf("server died with error: %v\n", err)
-	}
-}
-
-func dbOptions(environment string) (postgres.Options, error) {
-	maxConnections, err := strconv.Atoi(os.Getenv("MAX_DB_CONNECTIONS"))
-	if err != nil {
-		return postgres.Options{}, fmt.Errorf("error parsing MAX_DB_CONNECTIONS: %v\n", err)
-	}
-
-	const defaultMaxConnections = 32
-	if maxConnections < 1 {
-		log.Printf("MAX_DB_CONNECTIONS must be >= 1, defaulting to %d\n", defaultMaxConnections)
-		maxConnections = defaultMaxConnections
-	}
-
-	port, err := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
-	if err != nil {
-		return postgres.Options{}, fmt.Errorf("error parsing POSTGRES_PORT: %v\n", err)
-	}
-
-	return postgres.Options{
-		User:             os.Getenv("POSTGRES_USER"),
-		Pass:             os.Getenv("POSTGRES_PASS"),
-		Host:             os.Getenv("POSTGRES_HOST"),
+	store, err := postgres.NewFromOptions(postgres.Options{
+		User:             os.Getenv("PG_USER"),
+		Pass:             os.Getenv("PG_PASS"),
+		Host:             os.Getenv("PG_HOST"),
 		Port:             port,
-		DBName:           os.Getenv("POSTGRES_DBNAME"),
-		SSLMode:          os.Getenv("POSTGRES_SSLMODE"),
-		MaxConnections:   maxConnections,
+		DBName:           os.Getenv("PG_DB_NAME"),
+		SSLMode:          os.Getenv("PG_SSL_MODE"),
 		StatementTimeout: 5000,
-	}, nil
+	})
+	if err != nil {
+		fmt.Printf("unable to connect to postgres server with options: %v\n", err)
+		os.Exit(1)
+	}
+
+	maxConnections, err := strconv.Atoi(os.Getenv("PG_MAX_CONNECTIONS"))
+	if err != nil {
+		fmt.Printf("unable to parse 'PG_MAX_CONNECTIONS': %v\n", err)
+		os.Exit(1)
+	}
+
+	server, err := server.New(store, os.Stdout, os.Getenv("TBA_API_KEY"), maxConnections)
+	if err != nil {
+		fmt.Printf("unable to create server: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := server.Run(":" + os.Getenv("PORT")); err != nil {
+		fmt.Printf("unable to start server: %v\n", err)
+		os.Exit(1)
+	}
 }
