@@ -12,7 +12,10 @@ Some environment variables are needed to tell the app what to connect to.
 - PG_SSL_MODE: postgres ssl mode
 - PG_MAX_CONNECTIONS: postgres maximum connections
 - TBA_API_KEY: the blue alliance api key
-- PORT: port to listen on
+- HTTP_ADDR: http address
+- HTTPS_ADDR: https address
+- CERT_FILE: path to ssl certificate file
+- KEY_FILE: path to ssl key file
 
 ## Running
 

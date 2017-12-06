@@ -44,11 +44,20 @@ type Server struct {
 	maxHandlers int
 	tbaAPIKey   string
 	jwtSecret   []byte
+	certFile    string
+	keyFile     string
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(store *store.Service, logWriter io.Writer, tbaAPIKey string, maxHandlers int) (*Server, error) {
-	s := &Server{logger: logger.New(logWriter), store: store, tbaAPIKey: tbaAPIKey, maxHandlers: maxHandlers}
+func New(store *store.Service, logWriter io.Writer, tbaAPIKey string, maxHandlers int, certFile, keyFile string) (*Server, error) {
+	s := &Server{
+		logger:      logger.New(logWriter),
+		store:       store,
+		tbaAPIKey:   tbaAPIKey,
+		maxHandlers: maxHandlers,
+		certFile:    certFile,
+		keyFile:     keyFile,
+	}
 
 	s.initializeRouter()
 	s.initializeMiddlewares()
@@ -63,8 +72,46 @@ func New(store *store.Service, logWriter io.Writer, tbaAPIKey string, maxHandler
 }
 
 // Run starts a running the server on the specified address
-func (s *Server) Run(addr string) error {
-	return http.ListenAndServe(addr, s.Handler)
+func (s *Server) Run(httpAddr, httpsAddr string) error {
+	if s.certFile == "" && s.keyFile == "" {
+		return http.ListenAndServe(httpAddr, s.Handler)
+	}
+
+	errChan := make(chan error)
+
+	httpServer := &http.Server{
+		Addr:              httpAddr,
+		Handler:           s.Handler,
+		ReadTimeout:       time.Second * 15,
+		ReadHeaderTimeout: time.Second * 15,
+		WriteTimeout:      time.Second * 15,
+		IdleTimeout:       time.Second * 30,
+		MaxHeaderBytes:    4096,
+	}
+
+	httpsServer := &http.Server{
+		Addr:              httpsAddr,
+		Handler:           s.Handler,
+		ReadTimeout:       time.Second * 15,
+		ReadHeaderTimeout: time.Second * 15,
+		WriteTimeout:      time.Second * 15,
+		IdleTimeout:       time.Second * 30,
+		MaxHeaderBytes:    4096,
+	}
+
+	go func() {
+		errChan <- httpServer.ListenAndServe()
+	}()
+
+	go func() {
+		errChan <- httpsServer.ListenAndServeTLS(s.certFile, s.keyFile)
+	}()
+
+	err := <-errChan
+	httpServer.Close()
+	httpsServer.Close()
+
+	return err
 }
 
 func (s *Server) initializeRouter() {

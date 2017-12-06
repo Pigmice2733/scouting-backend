@@ -18,7 +18,10 @@ import (
 // PG_SSL_MODE: postgres ssl mode
 // PG_MAX_CONNECTIONS: postgres maximum connections
 // TBA_API_KEY: the blue alliance api key
-// PORT: port to listen on
+// HTTP_ADDR: http address
+// HTTPS_ADDR: https address
+// CERT_FILE: path to ssl certificate file
+// KEY_FILE: path to ssl key file
 
 func main() {
 	port, err := strconv.Atoi(os.Getenv("PG_PORT"))
@@ -47,13 +50,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	server, err := server.New(store, os.Stdout, os.Getenv("TBA_API_KEY"), maxConnections)
+	server, err := server.New(
+		store, os.Stdout, os.Getenv("TBA_API_KEY"), maxConnections,
+		os.Getenv("CERT_FILE"), os.Getenv("KEY_FILE"))
 	if err != nil {
 		fmt.Printf("unable to create server: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := server.Run(":" + os.Getenv("PORT")); err != nil {
+	if err := server.Run(os.Getenv("HTTP_ADDR"), os.Getenv("HTTPS_ADDR")); err != nil {
 		fmt.Printf("unable to start server: %v\n", err)
 		os.Exit(1)
 	}
