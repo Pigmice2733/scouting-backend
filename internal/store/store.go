@@ -46,9 +46,5 @@ func (s *Service) Close() error {
 		return err
 	}
 
-	if err := s.User.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	return s.User.Close()
 }

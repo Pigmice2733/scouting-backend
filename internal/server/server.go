@@ -405,12 +405,10 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
 
+	report.Reporter = ""
 	if reporter, ok := r.Context().Value(keyUsernameCtx).(string); ok {
 		report.Reporter = reporter
-	} else {
-		report.Reporter = ""
 	}
 
 	matchExists, err := s.store.Match.Exists(eventKey, matchKey)
@@ -508,12 +506,10 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
 
+	report.Reporter = ""
 	if reporter, ok := r.Context().Value(keyUsernameCtx).(string); ok {
 		report.Reporter = reporter
-	} else {
-		report.Reporter = ""
 	}
 
 	allianceID, a, err := s.findAlliance(matchKey, report)
