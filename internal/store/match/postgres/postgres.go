@@ -201,38 +201,47 @@ func (s *Service) upsertMatch(match match.Match, as alliance.Service) error {
 
 	err = upsertOnlyMatch(transaction, match)
 	if err != nil {
-		transaction.Rollback()
+		if err := transaction.Rollback(); err != nil {
+			return err
+		}
 		return err
 	}
 
 	redAllianceID, err := as.Upsert(transaction, match.RedAlliance)
 	if err != nil {
-		transaction.Rollback()
+		if err := transaction.Rollback(); err != nil {
+			return err
+		}
 		return err
 	}
 	for _, team := range match.RedAlliance.Teams {
 		team.AllianceID = redAllianceID
 		if err := as.UpsertTeam(transaction, team); err != nil {
-			transaction.Rollback()
+			if err := transaction.Rollback(); err != nil {
+				return err
+			}
 			return err
 		}
 	}
 
 	blueAllianceID, err := as.Upsert(transaction, match.BlueAlliance)
 	if err != nil {
-		transaction.Rollback()
+		if err := transaction.Rollback(); err != nil {
+			return err
+		}
 		return err
 	}
 	for _, team := range match.BlueAlliance.Teams {
 		team.AllianceID = blueAllianceID
 		if err := as.UpsertTeam(transaction, team); err != nil {
-			transaction.Rollback()
+			if err := transaction.Rollback(); err != nil {
+				return err
+			}
 			return err
 		}
 	}
 
-	transaction.Commit()
-	return nil
+	return transaction.Commit()
 }
 
 // Performs modified upsert - set values are not overwritten with null

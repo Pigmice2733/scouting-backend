@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Pigmice2733/scouting-backend/internal/respond"
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store/alliance"
@@ -21,19 +21,11 @@ import (
 
 	"context"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/internal/logger"
 	"github.com/Pigmice2733/scouting-backend/internal/store"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/didip/tollbooth"
 	"github.com/gorilla/mux"
-	"golang.org/x/crypto/sha3"
-)
-
-type key int
-
-const (
-	keyUsernameCtx key = iota
 )
 
 // A Server is an instance of the scouting server
@@ -132,10 +124,7 @@ func (s *Server) initializeRouter() {
 }
 
 func (s *Server) initializeMiddlewares() {
-	s.Handler = tollbooth.LimitHandler(tollbooth.NewLimiter(1, nil),
-		limitHandler(
-			gziphandler.GzipHandler(
-				addDefaultHeaders(s.Handler))))
+	s.Handler = tollbooth.LimitHandler(tollbooth.NewLimiter(1, nil), limitHandler(addDefaultHeaders(s.Handler)))
 }
 
 // REST Endpoint Handlers -----------------------
@@ -176,13 +165,12 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 	ss, err := s.GenerateJWT(user.Username)
 	if err != nil {
+		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("generating jwt token: %v", err)})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	noCache(w, 0)
-
-	json.NewEncoder(w).Encode(map[string]string{"jwt": ss})
+	respond.JSON(w, map[string]string{"jwt": ss})
 }
 
 func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
@@ -195,48 +183,26 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
 		if err == store.ErrNoResults {
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		} else {
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("getting user: %v", err)})
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	normalCache(w, 1440)
-
-	json.NewEncoder(w).Encode(user)
+	respond.JSON(w, user)
 }
 
 func (s *Server) getUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := s.store.User.GetUsers()
-	if err != nil && err != store.ErrNoResults {
+	if err == store.ErrNoResults {
+		users = []user.User{}
+	} else if err != nil {
 		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("getting users from database: %v", err)})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	response, err := json.Marshal(users)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("marshalling json response: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	normalCache(w, 1440)
-
-	foundMatchingEtag, err := addETags(w, r, response)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("adding eTag: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	if foundMatchingEtag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-	}
+	respond.JSON(w, users)
 }
 
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
@@ -252,17 +218,17 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(authInfo.Password), bcrypt.DefaultCost)
 	if err != nil {
+		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("generating bcrypt hash from password: %v", err)})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	user := user.User{Username: authInfo.Username, HashedPassword: string(hashedPassword)}
 	if err := s.store.User.Create(user); err != nil {
+		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("creating user: %v", err)})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-
-	noCache(w, 0)
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -273,11 +239,10 @@ func (s *Server) deleteUser(w http.ResponseWriter, r *http.Request) {
 	username := vars["username"]
 
 	if err := s.store.User.Delete(username); err != nil {
+		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("deleting user: %v", err)})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-
-	noCache(w, 0)
 }
 
 func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
@@ -296,7 +261,7 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("setting when events were last modified: %v", err)})
 		}
 		if errs := s.store.Event.UpdateEvents(events, s.maxHandlers); len(errs) != 0 {
-			s.logger.LogRequestJSON(r, map[string]interface{}{"errors": errs})
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": "updating events", "errors": errs})
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -313,31 +278,7 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := json.Marshal(events)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("marshalling json response: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	normalCache(w, 1440)
-
-	foundMatchingEtag, err := addETags(w, r, response)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("adding eTag: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	if foundMatchingEtag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	respond.JSON(w, events)
 }
 
 func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +289,7 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	e, err := s.store.Event.Get(eventKey)
 	if err != nil {
 		if err == store.ErrNoResults {
-			http.Error(w, "non-existent event key", http.StatusNotFound)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		} else {
 			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("getting events: %v", err)})
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -390,38 +331,12 @@ func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fullEvent := event.Event{
+	respond.JSON(w, event.Event{
 		Key:     e.Key,
 		Name:    e.Name,
 		Date:    e.Date,
 		Matches: matches,
-	}
-
-	response, err := json.Marshal(fullEvent)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("marshalling json: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	normalCache(w, 1)
-
-	foundMatchingEtag, err := addETags(w, r, response)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("adding eTag: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	if foundMatchingEtag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	})
 }
 
 func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
@@ -434,8 +349,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == store.ErrNoResults {
-			message := fmt.Sprintf("non-existent match key '%v' under event key '%v'", matchKey, eventKey)
-			http.Error(w, message, http.StatusNotFound)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		} else {
 			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("getting match: %v", err)})
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -476,31 +390,7 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	match.BlueAlliance = blueAlliance
 	match.RedAlliance = redAlliance
 
-	response, err := json.Marshal(match)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("marshalling json: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	normalCache(w, 1)
-
-	foundMatchingEtag, err := addETags(w, r, response)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("adding eTag: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	if foundMatchingEtag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	respond.JSON(w, match)
 }
 
 func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
@@ -512,7 +402,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	var report report.Report
 
 	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
-		http.Error(w, "invalid request payload", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
@@ -531,7 +421,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !matchExists {
-		http.Error(w, "error: posting report to non-existent match", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -548,20 +438,32 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		allianceID, err := s.store.Alliance.Create(a)
 		a.ID = allianceID
 		if err != nil {
-			http.Error(w, "no corresponding match for posted report", http.StatusBadRequest)
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("creating alliance: %v", err)})
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
 		err = s.store.Alliance.CreateTeam(allianceID, team)
 		if err != nil {
-			http.Error(w, "failed to create team in alliance", http.StatusBadRequest)
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("creating team: %v", err)})
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
 	} else {
 		a.ID = alllianceID
 		teams, err := s.store.Alliance.GetTeams(a.ID)
+		if err != nil {
+			if err == store.ErrNoResults {
+				teams = []alliance.Team{}
+			} else {
+				s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("getting teams: %v", err)})
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+		}
+
 		for _, team := range teams {
 			if report.Team == team.Number {
-				http.Error(w, "report for team already exists, use 'PUT' to update", http.StatusConflict)
+				http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
 				return
 			}
 		}
@@ -569,7 +471,8 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		a.Score = report.Score
 		err = s.store.Alliance.Update(a)
 		if err != nil {
-			http.Error(w, "failed to update alliance data", http.StatusBadRequest)
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("updating alliances: %v", err)})
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
@@ -578,7 +481,8 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		a.Teams = []alliance.Team{team}
 		err = s.store.Alliance.CreateTeam(a.ID, team)
 		if err != nil {
-			http.Error(w, "failed to create team in alliance", http.StatusBadRequest)
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("creating team: %v", err)})
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -589,21 +493,7 @@ func (s *Server) postReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := json.Marshal(report)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("marshalling response: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	normalCache(w, 1)
-
-	w.WriteHeader(http.StatusCreated)
-
-	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	respond.JSON(w, report)
 }
 
 func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
@@ -615,7 +505,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	var report report.Report
 
 	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
-		http.Error(w, "invalid request payload", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
@@ -629,7 +519,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	allianceID, a, err := s.findAlliance(matchKey, report)
 	if err != nil {
 		if err == store.ErrNoResults {
-			http.Error(w, "report does not exist, use 'POST' to create a new report", http.StatusNotFound)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
 		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("updating report: %v", err)})
@@ -638,6 +528,16 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	a.ID = allianceID
 	teams, err := s.store.Alliance.GetTeams(a.ID)
+	if err != nil {
+		if err == store.ErrNoResults {
+			teams = []alliance.Team{}
+		} else {
+			s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("getting teams for alliance: %v", err)})
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+	}
+
 	teamReportExists := false
 	for _, team := range teams {
 		if report.Team == team.Number {
@@ -646,12 +546,12 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !teamReportExists {
-		http.Error(w, "report does not exist, use 'POST' to create a new report", http.StatusNotFound)
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
 
 	if report.Team != teamNumber {
-		http.Error(w, "report team does not match team specified in URI", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -661,19 +561,7 @@ func (s *Server) updateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := json.Marshal(report)
-	if err != nil {
-		s.logger.LogRequestJSON(r, map[string]interface{}{"error": fmt.Sprintf("marshalling json: %v", err)})
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	normalCache(w, 1)
-
-	if _, err := w.Write(response); err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	respond.JSON(w, report)
 }
 
 func (s *Server) findAlliance(matchKey string, report report.Report) (int, alliance.Alliance, error) {
@@ -687,53 +575,8 @@ func (s *Server) findAlliance(matchKey string, report report.Report) (int, allia
 	return a.ID, a, err
 }
 
-func (s *Server) createEvents(events []event.Event) error {
-	for _, event := range events {
-		err := s.store.Event.Create(event)
-		if err != nil {
-			s.logger.LogJSON(map[string]interface{}{"event": event, "error": fmt.Sprintf("creating event: %v", err)})
-			return err
-		}
-	}
-	return nil
-}
-
-func normalCache(w http.ResponseWriter, cacheMinutes int) {
-	cacheControl := fmt.Sprintf("public, max-age=%d", (cacheMinutes * 60))
-	if cacheMinutes == 0 {
-		cacheControl = "no-cache"
-	}
-
-	w.Header().Set("Cache-Control", cacheControl)
-}
-
-func noCache(w http.ResponseWriter, cacheMinutes int) {
-	w.Header().Set("Cache-Control", "no-store")
-}
-
-func addETags(w http.ResponseWriter, r *http.Request, response []byte) (bool, error) {
-	contentETag, err := generateEtag(response)
-	if err != nil {
-		return false, err
-	}
-
-	ifNoneMatch := r.Header["If-None-Match"]
-
-	for _, eTag := range ifNoneMatch {
-		if eTag == contentETag {
-			return true, nil
-		}
-	}
-
-	w.Header().Set("ETag", contentETag)
-
-	return false, nil
-}
-
 func addDefaultHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Vary", "Accept-Encoding")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		next.ServeHTTP(w, r)
 	})
@@ -761,6 +604,12 @@ func limitHandler(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+type key int
+
+const (
+	keyUsernameCtx key = iota
+)
 
 func (s *Server) authHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -792,29 +641,6 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), keyUsernameCtx, username)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-func generateEtag(content []byte) (string, error) {
-	hash := make([]byte, 32)
-	d := sha3.NewShake256()
-	// Write the response into the hash
-	if _, err := d.Write(content); err != nil {
-		return "", err
-	}
-	// Read 32 bytes of output from the hash into h.
-	if _, err := d.Read(hash); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hash), nil
-}
-
-func isError(statusCode int) bool {
-	// HTTP error codes are status codes 4xx-5xx
-	if statusCode >= 400 && statusCode < 600 {
-		return true
-	}
-	return false
 }
 
 func generateSecret(secretLength int) ([]byte, error) {

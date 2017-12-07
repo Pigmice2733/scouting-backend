@@ -5,19 +5,6 @@ import (
 	"net/http"
 )
 
-// Error returns a structured error for API responses
-func Error(err error) interface{} {
-	response := struct {
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}{}
-
-	response.Error.Message = err.Error()
-
-	return response
-}
-
 // JSON responds with the first non-nil payload, formats error messages
 func JSON(w http.ResponseWriter, responses ...interface{}) {
 	respond := func(payload interface{}) {
@@ -36,13 +23,11 @@ func JSON(w http.ResponseWriter, responses ...interface{}) {
 			if err == nil {
 				continue
 			}
-			respond(Error(err))
+			respond(map[string]error{"error": err})
 		case error:
-			respond(Error(value))
+			respond(map[string]error{"error": value})
 		default:
-			respond(struct {
-				Response interface{} `json:"response"`
-			}{response})
+			respond(response)
 		}
 		// exit on the first output
 		break
