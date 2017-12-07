@@ -22,3 +22,13 @@ Some environment variables are needed to tell the app what to connect to.
 - Go to main directory for the server: `cd cmd/scouting-backend`
 - Build: `go build`
 - Run: `./scouting-backend`
+
+## Pushing to Docker Hub
+
+- Build the docker image: `docker build -t scouting-backend .`
+- Get the docker image ID (the one we just created): `docker images`
+- Tag the docker image: `docker tag {docker id} fharding/scouting-backend:latest`
+- Push the docker image: `docker push fharding/scouting-backend:latest`
+
+Keep in mind you will obviously need access to fharding/scouting-backend.
+Docker Cloud should automatically re-deploy.
