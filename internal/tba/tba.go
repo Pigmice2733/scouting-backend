@@ -141,7 +141,7 @@ func GetMatches(tbaURL, tbaKey, eventKey, lastModified string) ([]match.Match, s
 			ActualTime:      actualMatchTime.UTC(),
 			WinningAlliance: tbaMatch.WinningAlliance,
 			RedAlliance:     populateAlliance(false, tbaMatch.Key, tbaMatch.Alliances.Red),
-			BlueAlliance:    populateAlliance(false, tbaMatch.Key, tbaMatch.Alliances.Blue),
+			BlueAlliance:    populateAlliance(true, tbaMatch.Key, tbaMatch.Alliances.Blue),
 		})
 	}
 
