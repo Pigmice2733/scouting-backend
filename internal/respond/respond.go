@@ -10,7 +10,7 @@ func JSON(w http.ResponseWriter, responses ...interface{}) {
 	respond := func(payload interface{}) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 	}
 
