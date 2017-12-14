@@ -4,12 +4,12 @@
 
 ### Go
 
-| Name      | Type          | Tags      | Example                         |
-| --------- | ------------- | --------- | ------------------------------- |
-| Key       | string        |           | "2017cmptx"                     |
-| Name      | string        |           | "Einstein Field (Houston)"      |
-| ShortName | string        |           | "Einstein (Houston)"            |
-| Date      | time.Time     |           | 2017-04-21 17:00:00 -0700 -0700 |
+| Name      | Type          | Tags      | Example                    |
+| --------- | ------------- | --------- | -------------------------- |
+| Key       | string        |           | "2017cmptx"                |
+| Name      | string        |           | "Einstein Field (Houston)" |
+| ShortName | string        |           | "Einstein (Houston)"       |
+| Date      | time.Time     |           | 2017-07-29T15:20:00Z       |
 
 ### PostgreSQL
 
@@ -17,53 +17,53 @@ See [Event](#event)
 
 ### JSON
 
-| Name      | Type            | Comments      | Example                    |
-| --------- | ----------------| ------------- | -------------------------- |
-| key       | string          |               | "2017cmptx"                |
-| name      | string          |               | "Einstein Field (Houston)" |
-| shortName | string          |               | "Einstein (Houston)"       |
-| date      | int (UNIX TIME) |               | 1512764281                 |
+| Name      | Type   | Comments      | Example                    |
+| --------- | ------ | ------------- | -------------------------- |
+| key       | string |               | "2017cmptx"                |
+| name      | string |               | "Einstein Field (Houston)" |
+| shortName | string |               | "Einstein (Houston)"       |
+| date      | string |               | "2017-07-29T15:20:00Z"     |
 
 
 ## Event
 
 ### Go
 
-| Name      | Type                            | Tags | Example                         |
-| --------- | ------------------------------- | ---- | ------------------------------- |
-|           | [event.BasicEvent](#basicevent) |      | See [BasicEvent](#basicevent)   |
-| Matches   | [][match.Match](#match)         |      | See [Match](#match)             |
+| Name      | Type                              | Tags | Example                         |
+| --------- | --------------------------------- | ---- | ------------------------------- |
+|           | [event.BasicEvent](#basicevent)   |      | See [BasicEvent](#basicevent)   |
+| Matches   | [][match.BasicMatch](#basicmatch) |      | See [BasicMatch](#basicmatch)   |
 
 ### PostgreSQL
 
-| Name      | Type             | Constraints | Example                         |
-| --------- | ---------------- | ----------- | ------------------------------- |
-| key       | TEXT PRIMARY KEY |             | "2017cmptx"                     |
-| name      | TEXT             | NOT NULL    | "Einstein Field (Houston)"      |
-| shortName | TEXT             |             | "Einstein (Houston)"            |
-| date      | TIMESTAMPTZ      | NOT NULL    | 2017-04-21 17:00:00 -0700 -0700 |
+| Name      | Type             | Constraints | Example                    |
+| --------- | ---------------- | ----------- | -------------------------- |
+| key       | TEXT PRIMARY KEY |             | "2017cmptx"                |
+| name      | TEXT             | NOT NULL    | "Einstein Field (Houston)" |
+| shortName | TEXT             |             | "Einstein (Houston)"       |
+| date      | TIMESTAMPTZ      | NOT NULL    | 2017-07-29T15:20:00Z       |
 
 ### JSON
 
-| Name      | Type                    | Comments | Example                    |
-| --------- | ----------------------- | -------- | -------------------------- |
-| key       | string                  |          | "2017cmptx"                |
-| name      | string                  |          | "Einstein Field (Houston)" |
-| shortName | string                  |          | "Einstein (Houston)"       |
-| date      | int (UNIX TIME)         |          | 1512764281                 |
-| matches   | [][match.Match](#match) |          | See [Match](#match)        |
+| Name      | Type                              | Comments | Example                       |
+| --------- | --------------------------------- | -------- | ----------------------------- |
+| key       | string                            |          | "2017cmptx"                   |
+| name      | string                            |          | "Einstein Field (Houston)"    |
+| shortName | string                            |          | "Einstein (Houston)"          |
+| date      | string                            |          | "2017-07-29T15:20:00Z"        |
+| matches   | [][match.BasicMatch](#basicmatch) |          | See [BasicMatch](#basicmatch) |
 
 
 ## BasicMatch
 
 ### Go
 
-| Name              | Type              | Tags      | Example                           |
-| ----------------- | ----------------- | --------- | --------------------------------- |
-| Key               | string            |           | "2017cmptx_sf1m13"                |
-| EventKey          | string            | -         | "2017cmptx"                       |
-| PredictedTime     | time.Time         | omitempty | 2017-04-21 17:00:00 -0700 -0700   |
-| ActualTime        | time.Time         | omitempty | 2017-04-21 17:00:00 -0700 -0700   |
+| Name              | Type              | Tags      | Example              |
+| ----------------- | ----------------- | --------- | -------------------- |
+| Key               | string            |           | "2017cmptx_sf1m13"   |
+| EventKey          | string            | -         | "2017cmptx"          |
+| PredictedTime     | time.Time         | omitempty | 2017-07-29T15:20:00Z |
+| ActualTime        | time.Time         | omitempty | 2017-07-29T15:20:00Z |
 
 ### PostgreSQL
 
@@ -71,11 +71,11 @@ See [Match](#match)
 
 ### JSON
 
-| Name              | Type              | Comments      | Example                           |
-| ----------------- | ----------------- | ------------- | --------------------------------- |
-| key               | string            |               | "2017cmptx_sf1m13"                |
-| predictedTime     | int (UNIX TIME)   | Omit if empty | 1512764281                        |
-| actualTime        | int (UNIX TIME)   | Omit if empty | 1512764281                        |
+| Name              | Type   | Comments      | Example                |
+| ----------------- | ------ | ------------- | ---------------------- |
+| key               | string |               | "2017cmptx_sf1m13"     |
+| predictedTime     | string | Omit if empty | "2017-07-29T15:20:00Z" |
+| actualTime        | string | Omit if empty | "2017-07-29T15:20:00Z" |
 
 
 ## Match
@@ -91,23 +91,23 @@ See [Match](#match)
 
 ### PostgreSQL
 
-| Name            | Type              | Constraints                                  | Example                         |
-| --------------- | ----------------- | -------------------------------------------- | ------------------------------- |
-| key             | TEXT PRIMARY KEY  |                                              | "2017cmptx_sf1m13"              |
-| eventKey        | TEXT NOT NULL     | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"                     |
-| predictedTime   | TIMESTAMPTZ       |                                              | 2017-04-21 17:00:00 -0700 -0700 |
-| actualTime      | TIMESTAMPTZ       |                                              | 2017-04-21 17:00:00 -0700 -0700 |
-| winningAlliance | TEXT              |                                              | "blue"                          |
-| redScore        | INTEGER           |                                              | 83                              |
-| blueScore       | INTEGER           |                                              | 96                              |
+| Name            | Type              | Constraints                                  | Example              |
+| --------------- | ----------------- | -------------------------------------------- | -------------------- |
+| key             | TEXT PRIMARY KEY  |                                              | "2017cmptx_sf1m13"   |
+| eventKey        | TEXT NOT NULL     | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"          |
+| predictedTime   | TIMESTAMPTZ       |                                              | 2017-07-29T15:20:00Z |
+| actualTime      | TIMESTAMPTZ       |                                              | 2017-07-29T15:20:00Z |
+| winningAlliance | TEXT              |                                              | "blue"               |
+| redScore        | INTEGER           |                                              | 83                   |
+| blueScore       | INTEGER           |                                              | 96                   |
 
 ### JSON
 
 | Name              | Type                           | Comments      | Example                   |
 | ----------------- | ------------------------------ | ------------- | ------------------------- |
 | key               | string                         |               | "2017cmptx_sf1m13"        |
-| predictedTime     | int (UNIX TIME)                | Omit if empty | 1512764281                |
-| actualTime        | int (UNIX TIME)                | Omit if empty | 1512764281                |
+| predictedTime     | string                         | Omit if empty | "2017-07-29T15:20:00Z"    |
+| actualTime        | string                         | Omit if empty | "2017-07-29T15:20:00Z"    |
 | blueWon           | bool                           | Omit if empty | true                      |
 | redAlliance       | [alliance.Alliance](#alliance) |               | See [Alliance](#alliance) |
 | blueAlliance      | [alliance.Alliance](#alliance) |               | See [Alliance](#alliance) |
@@ -140,7 +140,7 @@ Not stored.
 | Name           | Type                       | Constraints                                            | Example                         |
 | -------------- | -------------------------- | ------------------------------------------------------ | ------------------------------- |
 | matchKey       | TEXT                       | NOT NULL FOREIGN KEY(matchKey) REFERENCES matches(key) | "2017cmptx_sf1m13"              |
-| isAllianceBlue | BOOLEAN                    | NOT NULL                                               | true                            |
+| isBlue         | BOOLEAN                    | NOT NULL                                               | true                            |
 | number         | TEXT                       | NOT NULL                                               | "frc2733b"                      |
 
 
@@ -153,7 +153,7 @@ Not stored.
 | Reporter          | string                 |      | "JohnSmith2"       |
 | EventKey          | string                 |      | "2017cmptx"        |
 | MatchKey          | string                 |      | "2017cmptx_sf1m13" |
-| IsAllianceBlue    | bool                   |      | true               |
+| IsBlueAlliance    | bool                   |      | true               |
 | Team              | string                 |      | "frc2740b"         |
 | Stats             | map[string]interface{} |      |                    |
 
@@ -164,7 +164,7 @@ Not stored.
 | reporter          | TEXT              | NOT NULL FOREIGN KEY(reporter) REFERENCES users(username) | "JohnSmith2"       |
 | eventKey          | TEXT              | NOT NULL FOREIGN KEY(eventKey) REFERENCES events(key)     | "2017cmptx"        |
 | matchKey          | TEXT              | NOT NULL FOREIGN KEY(matchKey) REFERENCES matches(key)    | "2017cmptx_sf1m13" |
-| isAllianceBlue    | BOOLEAN           | NOT NULL                                                  | true               |
+| isBlueAlliance    | BOOLEAN           | NOT NULL                                                  | true               |
 | team              | TEXT              | NOT NULL                                                  | "frc2740b"         |
 | stats             | TEXT              | NOT NULL                                                  |                    |
 |                   |                   | UNIQUE(eventKey, matchKey)                                |                    |
@@ -174,7 +174,7 @@ Not stored.
 | Name              | Type   | Comments | Example                                        |
 | ----------------- | ------ | -------- | ---------------------------------------------- |
 | reporter          | string |          | "JohnSmith2"                                   |
-| isAllianceBlue    | bool   |          | true                                           |
+| isBlueAlliance    | bool   |          | true                                           |
 | team              | string |          | ["frc2471", "frc2733", "frc1418"]              |
 | stats             | object |          | { climbed: true, gears: 6, crossedLine: true } |
 
