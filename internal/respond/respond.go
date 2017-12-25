@@ -23,9 +23,9 @@ func JSON(w http.ResponseWriter, responses ...interface{}) {
 			if err == nil {
 				continue
 			}
-			respond(map[string]error{"error": err})
+			respond(map[string]string{"error": err.Error()})
 		case error:
-			respond(map[string]error{"error": value})
+			respond(map[string]string{"error": value.Error()})
 		default:
 			respond(response)
 		}

@@ -1,0 +1,5 @@
+{
+	"climbed": "bool",
+	"movedBunnies": "number",
+	"movedBuckets": "number"
+}

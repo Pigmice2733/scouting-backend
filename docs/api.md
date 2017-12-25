@@ -31,24 +31,6 @@ For retrieving a JWT token for authenticated requests.
 
 ---
 
-## /users - GET - Authenticated
-
-Gets all users.
-
-### Response Body
-
-```json
-[
-  {
-    "username": "frank",
-    "hashedPassword": "$2b$12$29H98PpF9E/CccCc.OEBfObX4Sm0coLZE6cCWSAmaNQkveGhop5lW"
-  },
-  ...
-]
-```
-
----
-
 ## /users - POST - Authenticated
 
 Creates a new user.
@@ -59,21 +41,6 @@ Creates a new user.
 {
   "username": "frank2",
   "password": "asdf"
-}
-```
-
----
-
-## /users/{username} - GET - Authenticated
-
-Gets a user.
-
-### Response Body
-
-```json
-{
-  "username": "frank",
-  "hashedPassword": "$2b$12$29H98PpF9E/CccCc.OEBfObX4Sm0coLZE6cCWSAmaNQkveGhop5lW"
 }
 ```
 
@@ -146,14 +113,10 @@ Gets a complete match.
   "predictedTime": "2017-07-29T15:20:00Z",
   "actualTime": "2017-07-29T15:20:42Z",
   "blueWon": true,
-  "redAlliance": {
-    "score": 508,
-    "teams": [ "frc1011", "frc5499", "frc973" ]
-  },
-  "blueAlliance": {
-    "score": 342,
-    "teams": [ "frc254", "frc2767", "frc1676" ]
-  }
+  "redScore": 508,
+  "blueScore": 342,
+  "redAlliance": [ "frc1011", "frc5499", "frc973" ],
+  "blueAlliance": [ "frc1011", "frc5499", "frc973" ]
 }
 ```
 
@@ -163,12 +126,14 @@ Gets a complete match.
 
 Upserts a report
 
+The request body can change depending on the schema and data to analyze for the stats field.
+
 ### Request Body
 
 ```json
 {
   "reporter": "frank",
-  "isBlueAlliance": true,
+  "isBlue": true,
   "team": "frc2733",
   "stats": {
     "climbed": true,
@@ -191,35 +156,28 @@ The response body can change depending on the schema and data to analyze.
 [
   {
     "team": "frc254",
-    "stats": {
-      "climbed": 0.94,
-      "movedBunnies": 7.4,
-      "movedBuckets": 14.2
-    }
+    "climbed": 0.94,
+    "movedBunnies": 7.4,
+    "movedBuckets": 14.2
   },
   {
     "team": "frc2733",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 68.6,
-      "movedBuckets": 52.3
-    }
+    "climbed": 1,
+    "movedBunnies": 68.6,
+    "movedBuckets": 52.3
   },
   {
     "team": "frc2471",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 67.6,
-      "movedBuckets": 51.3
-    }
-  },
-  ...
+    "climbed": 1,
+    "movedBunnies": 67.6,
+    "movedBuckets": 51.3
+  }
 ]
 ```
 
 ---
 
-## /analysis/{eventKey}/{teamNumber} - GET
+## /analysis/{eventKey}/{team} - GET
 
 Stats about how a team has performed at an event on average.
 
@@ -237,7 +195,7 @@ The response body can change depending on the schema and data to analyze.
 
 ---
 
-## /analysis/{eventKey}/{matchKey}/{allianceColor} - GET
+## /analysis/{eventKey}/{matchKey}/{color} - GET
 
 Stats about how all teams on an alliance have performed at an event on average.
 
@@ -249,27 +207,37 @@ The response body can change depending on the schema and data to analyze.
 [
   {
     "team": "frc254",
-    "stats": {
-      "climbed": 0.94,
-      "movedBunnies": 7.4,
-      "movedBuckets": 14.2
-    }
+    "climbed": 0.94,
+    "movedBunnies": 7.4,
+    "movedBuckets": 14.2
   },
   {
     "team": "frc2733",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 68.6,
-      "movedBuckets": 52.3
-    }
+    "climbed": 1,
+    "movedBunnies": 68.6,
+    "movedBuckets": 52.3
   },
   {
     "team": "frc2471",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 67.6,
-      "movedBuckets": 51.3
-    }
+    "climbed": 1,
+    "movedBunnies": 67.6,
+    "movedBuckets": 51.3
   }
 ]
+```
+
+---
+
+## /schema
+
+Sends the report schema.
+
+### Response Body
+
+```json
+{
+  "climbed": "bool",
+  "movedBunnies": "number",
+  "movedBuckets": "number"
+}
 ```

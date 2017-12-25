@@ -3,90 +3,77 @@ package postgres
 import (
 	"database/sql"
 
-	"github.com/Pigmice2733/scouting-backend/internal/store"
 	"github.com/Pigmice2733/scouting-backend/internal/store/event"
+	"github.com/Pigmice2733/scouting-backend/internal/store/match"
 )
 
-// Service holds a db for events.
+// Service is used for getting information about an event from a postgres database.
 type Service struct {
 	db *sql.DB
 }
 
-// New returns a new Service with the given db.
+// New creates a new event service.
 func New(db *sql.DB) event.Service {
 	return &Service{db: db}
 }
 
-// Close closes the postgresql db connection.
-func (s *Service) Close() error {
-	return s.db.Close()
-}
+// GetBasicEvents returns basic event information fetched from the postgres database.
+func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
+	var bEvents []event.BasicEvent
 
-// Create creates a new event in the postgresql db.
-func (s *Service) Create(e event.Event) error {
-	_, err := s.db.Exec("INSERT INTO events(key, name, date) VALUES($1, $2, $3)", e.Key, e.Name, e.Date)
-	return err
-}
-
-// Get retrieves an event from the postgresql db.
-func (s *Service) Get(key string) (event.Event, error) {
-	e := event.Event{Key: key}
-	err := s.db.QueryRow("SELECT name, date FROM events WHERE key=$1", key).Scan(&e.Name, &e.Date)
-	if err == sql.ErrNoRows {
-		err = store.ErrNoResults
+	rows, err := s.db.Query("SELECT key, name, date, shortName FROM events")
+	if err != nil {
+		return bEvents, err
 	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var bEvent event.BasicEvent
+		if err := rows.Scan(&bEvent.Key, &bEvent.Name, &bEvent.Date, &bEvent.ShortName); err != nil {
+			return nil, err
+		}
+		bEvents = append(bEvents, bEvent)
+	}
+
+	return bEvents, rows.Err()
+}
+
+// Get gets a full event from the postgres database.
+func (s *Service) Get(key string, ms match.Service) (e event.Event, err error) {
+	e.Key = key
+
+	err = s.db.QueryRow("SELECT name, date, shortName FROM events WHERE key = $1", key).Scan(
+		&e.Name, &e.Date, &e.ShortName)
+	if err != nil {
+		return e, err
+	}
+
+	bMatches, err := ms.GetBasicMatches(key)
+	e.Matches = bMatches
 
 	return e, err
 }
 
-// GetEvents returns all the events in the postgresql db.
-func (s *Service) GetEvents() ([]event.Event, error) {
-	rows, err := s.db.Query("SELECT key, name, date FROM events")
+// MassUpsert upserts multiple events in the postgres database.
+func (s *Service) MassUpsert(bEvents []event.BasicEvent) error {
+	stmt, err := s.db.Prepare(`
+		INSERT INTO events (key, name, shortName, date)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (key)
+		DO
+			UPDATE
+				SET name = $2, shortName = $3, date = $4
+		`)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
+	defer stmt.Close()
 
-	events := []event.Event{}
-
-	for rows.Next() {
-		var e event.Event
-		if err := rows.Scan(&e.Key, &e.Name, &e.Date); err != nil {
-			return nil, err
-		}
-		events = append(events, e)
-	}
-
-	return events, rows.Err()
-}
-
-// UpdateEvents updates an all given events in the postgresql db, using as many
-// handlers as specified. Using multiple handlers to update the events concurrently
-// speeds up the process of updating events.
-func (s *Service) UpdateEvents(events []event.Event, handlers int) []error {
-	errorQueue := make(chan error, len(events))
-	eventQueue := make(chan event.Event)
-
-	for i := 0; i < handlers; i++ {
-		go func() {
-			for e := range eventQueue {
-				_, err := s.db.Exec("INSERT INTO events (key, name, date) VALUES ($1, $2, $3) ON CONFLICT (key) DO UPDATE SET name = $2, date = $3", e.Key, e.Name, e.Date)
-				errorQueue <- err
-			}
-		}()
-	}
-
-	for _, event := range events {
-		eventQueue <- event
-	}
-	close(eventQueue)
-
-	var errors []error
-	for i := 0; i < len(events); i++ {
-		if err := <-errorQueue; err != nil {
-			errors = append(errors, err)
+	for _, bEvent := range bEvents {
+		if _, err := stmt.Exec(bEvent.Key, bEvent.Name, bEvent.ShortName, bEvent.Date); err != nil {
+			return err
 		}
 	}
 
-	return errors
+	return nil
 }

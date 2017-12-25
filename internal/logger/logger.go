@@ -39,3 +39,9 @@ func (l *Service) LogRequestJSON(r *http.Request, inf map[string]interface{}) er
 	}
 	return l.LogJSON(reqLog)
 }
+
+// LogRequestError makes json encoded structured logs by using LogRequestJSON,
+// that contain request info and a given error.
+func (l *Service) LogRequestError(r *http.Request, err error) error {
+	return l.LogRequestJSON(r, map[string]interface{}{"error": err.Error()})
+}

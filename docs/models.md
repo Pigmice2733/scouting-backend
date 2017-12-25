@@ -24,15 +24,16 @@ See [Event](#event)
 | shortName | string |               | "Einstein (Houston)"       |
 | date      | string |               | "2017-07-29T15:20:00Z"     |
 
+---
 
 ## Event
 
 ### Go
 
-| Name      | Type                              | Tags | Example                         |
-| --------- | --------------------------------- | ---- | ------------------------------- |
-|           | [event.BasicEvent](#basicevent)   |      | See [BasicEvent](#basicevent)   |
-| Matches   | [][match.BasicMatch](#basicmatch) |      | See [BasicMatch](#basicmatch)   |
+| Name      | Type                            | Tags | Example                         |
+| --------- | ------------------------------- | ---- | ------------------------------- |
+|           | [event.BasicEvent](#basicevent) |      | See [BasicEvent](#basicevent)   |
+| Matches   | [][match.BasicMatch](#basicmatch)         |      | See [Match](#basicmatch)             |
 
 ### PostgreSQL
 
@@ -45,14 +46,15 @@ See [Event](#event)
 
 ### JSON
 
-| Name      | Type                              | Comments | Example                       |
-| --------- | --------------------------------- | -------- | ----------------------------- |
-| key       | string                            |          | "2017cmptx"                   |
-| name      | string                            |          | "Einstein Field (Houston)"    |
-| shortName | string                            |          | "Einstein (Houston)"          |
-| date      | string                            |          | "2017-07-29T15:20:00Z"        |
-| matches   | [][match.BasicMatch](#basicmatch) |          | See [BasicMatch](#basicmatch) |
+| Name      | Type                    | Comments | Example                    |
+| --------- | ----------------------- | -------- | -------------------------- |
+| key       | string                  |          | "2017cmptx"                |
+| name      | string                  |          | "Einstein Field (Houston)" |
+| shortName | string                  |          | "Einstein (Houston)"       |
+| date      | int (UNIX TIME)         |          | 1512764281                 |
+| matches   | [][match.Basic](#basicmatch) |          | See [Match](#basicmatch)        |
 
+---
 
 ## BasicMatch
 
@@ -77,72 +79,64 @@ See [Match](#match)
 | predictedTime     | string | Omit if empty | "2017-07-29T15:20:00Z" |
 | actualTime        | string | Omit if empty | "2017-07-29T15:20:00Z" |
 
+---
 
 ## Match
 
 ### Go
 
-| Name         | Type                            | Tags      | Example                           |
-| ------------ | ------------------------------- | --------- | --------------------------------- |
-|              | [match.BasicMatch](#basicmatch) |           | See [BasicMatch](#basicmatch)     |
-| BlueWon      | \*bool                          | omitempty | true                              |
-| RedAlliance  | [alliance.Alliance](#alliance)  |           | See [Alliance](#alliance)         |
-| BlueAlliance | [alliance.Alliance](#alliance)  |           | See [Alliance](#alliance)         |
+| Name         | Type                            | Tags      | Example                            |
+| ------------ | ------------------------------- | --------- | ---------------------------------  |
+|              | [match.BasicMatch](#basicmatch) |           | See [BasicMatch](#basicmatch)      |
+| BlueWon      | \*bool                          | omitempty | true                               |
+| RedAlliance  | []string                        |           | [ "frc1011", "frc5499", "frc973" ] |
+| BlueAlliance | []string                        |           | [ "frc1011", "frc5499", "frc973" ] |
 
 ### PostgreSQL
 
-| Name            | Type              | Constraints                                  | Example              |
-| --------------- | ----------------- | -------------------------------------------- | -------------------- |
-| key             | TEXT PRIMARY KEY  |                                              | "2017cmptx_sf1m13"   |
-| eventKey        | TEXT NOT NULL     | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"          |
-| predictedTime   | TIMESTAMPTZ       |                                              | 2017-07-29T15:20:00Z |
-| actualTime      | TIMESTAMPTZ       |                                              | 2017-07-29T15:20:00Z |
-| winningAlliance | TEXT              |                                              | "blue"               |
-| redScore        | INTEGER           |                                              | 83                   |
-| blueScore       | INTEGER           |                                              | 96                   |
+| Name            | Type              | Constraints                                  | Example                         |
+| --------------- | ----------------- | -------------------------------------------- | ------------------------------- |
+| key             | TEXT PRIMARY KEY  |                                              | "2017cmptx_sf1m13"              |
+| eventKey        | TEXT NOT NULL     | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"                     |
+| predictedTime   | TIMESTAMPTZ       |                                              | 2017-04-21 17:00:00 -0700 -0700 |
+| actualTime      | TIMESTAMPTZ       |                                              | 2017-04-21 17:00:00 -0700 -0700 |
+| blueWon         | BOOLEAN           |                                              | true                            |
+| redScore        | INTEGER           |                                              | 83                              |
+| blueScore       | INTEGER           |                                              | 96                              |
 
 ### JSON
 
-| Name              | Type                           | Comments      | Example                   |
-| ----------------- | ------------------------------ | ------------- | ------------------------- |
-| key               | string                         |               | "2017cmptx_sf1m13"        |
-| predictedTime     | string                         | Omit if empty | "2017-07-29T15:20:00Z"    |
-| actualTime        | string                         | Omit if empty | "2017-07-29T15:20:00Z"    |
-| blueWon           | bool                           | Omit if empty | true                      |
-| redAlliance       | [alliance.Alliance](#alliance) |               | See [Alliance](#alliance) |
-| blueAlliance      | [alliance.Alliance](#alliance) |               | See [Alliance](#alliance) |
+| Name              | Type                           | Comments      | Example                            |
+| ----------------- | ------------------------------ | ------------- | ---------------------------------- |
+| key               | string                         |               | "2017cmptx_sf1m13"                 |
+| predictedTime     | int (UNIX TIME)                | Omit if empty | 1512764281                         |
+| actualTime        | int (UNIX TIME)                | Omit if empty | 1512764281                         |
+| blueWon           | bool                           | Omit if empty | true                               |
+| blueAlliance      | []string                       |               | [ "frc1011", "frc5499", "frc973" ] |
+| redAlliance       | []string                       |               | [ "frc1011", "frc5499", "frc973" ] |
 
+---
 
 ## Alliance
 
-| Name              | Type                   | Tags | Example                           |
-| ----------------- | ---------------------- | ---- | --------------------------------- |
-| Score             | int                    |      | 96                                |
-| IsBlue            | bool                   |      | true                              |
-| Teams             | []string               |      | ["frc2471", "frc2733", "frc1418"] |
+### Go
 
-### PostgreSQL
-
-Not stored.
-
-## JSON
-
-| Name              | Type     | Comments | Example                           |
-| ----------------- | -------- | -------- | --------------------------------- |
-| score             | int      |          | 96                                |
-| isBlue            | bool     |          | true                              |
-| teams             | []string |          | ["frc2471", "frc2733", "frc1418"] |
-
-## Team
+An Alliance is just a []string in Go.
 
 ### PostgreSQL
 
 | Name           | Type                       | Constraints                                            | Example                         |
 | -------------- | -------------------------- | ------------------------------------------------------ | ------------------------------- |
-| matchKey       | TEXT                       | NOT NULL FOREIGN KEY(matchKey) REFERENCES matches(key) | "2017cmptx_sf1m13"              |
-| isBlue         | BOOLEAN                    | NOT NULL                                               | true                            |
-| number         | TEXT                       | NOT NULL                                               | "frc2733b"                      |
+| matchKey       | TEXT NOT NULL              | FOREIGN KEY(matchKey) REFERENCES matches(key)          | "2017cmptx_sf1m13"              |
+| isBlue         | BOOLEAN NOT NULL           |                                                        | true                            |
+| number         | TEXT NOT NULL              |                                                        | "frc2733b"                      |
+|                |                            | UNIQUE(matchKey, number)                               |                                 |
 
+### JSON
+
+An Alliance is just an array of strings (team numbers) in js.
+
+---
 
 ## Report
 
@@ -153,7 +147,7 @@ Not stored.
 | Reporter          | string                 |      | "JohnSmith2"       |
 | EventKey          | string                 |      | "2017cmptx"        |
 | MatchKey          | string                 |      | "2017cmptx_sf1m13" |
-| IsBlueAlliance    | bool                   |      | true               |
+| IsBlue            | bool                   |      | true               |
 | Team              | string                 |      | "frc2740b"         |
 | Stats             | map[string]interface{} |      |                    |
 
@@ -164,7 +158,7 @@ Not stored.
 | reporter          | TEXT              | NOT NULL FOREIGN KEY(reporter) REFERENCES users(username) | "JohnSmith2"       |
 | eventKey          | TEXT              | NOT NULL FOREIGN KEY(eventKey) REFERENCES events(key)     | "2017cmptx"        |
 | matchKey          | TEXT              | NOT NULL FOREIGN KEY(matchKey) REFERENCES matches(key)    | "2017cmptx_sf1m13" |
-| isBlueAlliance    | BOOLEAN           | NOT NULL                                                  | true               |
+| isBlue            | BOOLEAN           | NOT NULL                                                  | true               |
 | team              | TEXT              | NOT NULL                                                  | "frc2740b"         |
 | stats             | TEXT              | NOT NULL                                                  |                    |
 |                   |                   | UNIQUE(eventKey, matchKey)                                |                    |
@@ -174,31 +168,11 @@ Not stored.
 | Name              | Type   | Comments | Example                                        |
 | ----------------- | ------ | -------- | ---------------------------------------------- |
 | reporter          | string |          | "JohnSmith2"                                   |
-| isBlueAlliance    | bool   |          | true                                           |
+| isBlue            | bool   |          | true                                           |
 | team              | string |          | ["frc2471", "frc2733", "frc1418"]              |
 | stats             | object |          | { climbed: true, gears: 6, crossedLine: true } |
 
-
-## TBA Modified
-
-### Go
-
-| Name         | Type   | Tags | Example                         |
-| ------------ | ------ | ---- | ------------------------------- |
-| Endpoint     | string |      | "/events/2017cc"                |
-| LastModified | string |      | "Wed, 21 Oct 2015 07:28:00 GMT" |
-
-### PostgreSQL
-
-| Name                  | Type             | Constraints | Example                         |
-| --------------------- | ---------------- | ----------- | ------------------------------- |
-| endpoint              | TEXT PRIMARY KEY |             | "/events/2017cc"                |
-| lastModified          | TEXT NOT NULL    |             | "Wed, 21 Oct 2015 07:28:00 GMT" |
-
-### JSON
-
-Not sent to front end. Used for time conditional requests to the TBA API. See [HTTP Last-Modified](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Last-Modified) and [HTTP If-Modified-Since](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Modified-Since) for more information.
-
+---
 
 ## User
 

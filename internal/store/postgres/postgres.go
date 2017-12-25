@@ -5,12 +5,14 @@ import (
 	"fmt"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store"
-	postgresAlliance "github.com/Pigmice2733/scouting-backend/internal/store/alliance/postgres"
-	postgresEvent "github.com/Pigmice2733/scouting-backend/internal/store/event/postgres"
-	postgresMatch "github.com/Pigmice2733/scouting-backend/internal/store/match/postgres"
-	postgresReport "github.com/Pigmice2733/scouting-backend/internal/store/report/postgres"
-	postgresTBAModified "github.com/Pigmice2733/scouting-backend/internal/store/tbamodified/postgres"
-	postgresUser "github.com/Pigmice2733/scouting-backend/internal/store/user/postgres"
+	eventPostgres "github.com/Pigmice2733/scouting-backend/internal/store/event/postgres"
+	matchPostgres "github.com/Pigmice2733/scouting-backend/internal/store/match/postgres"
+
+	alliancePostgres "github.com/Pigmice2733/scouting-backend/internal/store/alliance/postgres"
+	reportPostgres "github.com/Pigmice2733/scouting-backend/internal/store/report/postgres"
+	userPostgres "github.com/Pigmice2733/scouting-backend/internal/store/user/postgres"
+	// for the postgres sql driver
+	_ "github.com/lib/pq"
 )
 
 // Options holds information for connecting to a postgres instance
@@ -39,104 +41,90 @@ func NewFromOptions(options Options) (*store.Service, error) {
 
 // New returns a new Service.
 func New(db *sql.DB) (*store.Service, error) {
-	tableCreationQueries := []string{
-		eventTableCreationQuery,
-		matchTableCreationQuery,
-		allianceTableCreationQuery,
-		allianceTeamsTableCreationQuery,
-		reportTableCreationQuery,
-		tbaModifiedTableCreationQuery,
-		usersTableCreationQuery,
+	if _, err := db.Exec(eventTableCreationQuery); err != nil {
+		return nil, err
 	}
 
-	for _, tableCreationQuery := range tableCreationQueries {
-		if _, err := db.Exec(tableCreationQuery); err != nil {
-			return nil, err
-		}
+	if _, err := db.Exec(matchTableCreationQuery); err != nil {
+		return nil, err
+	}
+
+	if _, err := db.Exec(allianceTableCreationQuery); err != nil {
+		return nil, err
+	}
+
+	if _, err := db.Exec(reportTableCreationQuery); err != nil {
+		return nil, err
+	}
+
+	if _, err := db.Exec(userTableCreationQuery); err != nil {
+		return nil, err
 	}
 
 	return &store.Service{
-		Alliance:    postgresAlliance.New(db),
-		Event:       postgresEvent.New(db),
-		Match:       postgresMatch.New(db),
-		Report:      postgresReport.New(db),
-		TBAModified: postgresTBAModified.New(db),
-		User:        postgresUser.New(db),
+		Event:    eventPostgres.New(db),
+		Match:    matchPostgres.New(db),
+		Alliance: alliancePostgres.New(db),
+		Report:   reportPostgres.New(db),
+		User:     userPostgres.New(db),
 	}, nil
 }
 
 const eventTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS events (
-	key  TEXT PRIMARY KEY,
+	key TEXT PRIMARY KEY,
 	name TEXT NOT NULL,
+	shortName TEXT,
 	date TIMESTAMPTZ NOT NULL
 )
 `
 
 const matchTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS matches (
-	key             TEXT PRIMARY KEY,
-	eventKey        TEXT NOT NULL,
-	predictedTime   TIMESTAMPTZ,
-	actualTime      TIMESTAMPTZ,
-	winningAlliance TEXT,
+	key TEXT PRIMARY KEY,
+	eventKey TEXT NOT NULL,
+	predictedTime TIMESTAMPTZ,
+	actualTime TIMESTAMPTZ,
+	blueWon BOOLEAN,
+	redScore INTEGER,
+	blueScore INTEGER,
 	FOREIGN KEY(eventKey) REFERENCES events(key)
 )
 `
 
 const allianceTableCreationQuery = `
 CREATE TABLE IF NOT EXISTS alliances (
-	id       SERIAL PRIMARY KEY NOT NULL,
 	matchKey TEXT NOT NULL,
-	isBlue   BOOLEAN NOT NULL,
-	score    INT NOT NULL,
+	isBlue BOOLEAN NOT NULL,
+	number TEXT NOT NULL,
 	FOREIGN KEY(matchKey) REFERENCES matches(key),
-	UNIQUE (matchKey, isBlue)
+	UNIQUE(matchKey, number)
 )
 `
 
-const allianceTeamsTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS allianceTeams
-(
-	number                TEXT NOT NULL,
-	allianceID            INT NOT NULL,
-	predictedContribution TEXT,
-	actualContribution    TEXT,
-	FOREIGN KEY(allianceID) REFERENCES alliances(id),
-	UNIQUE (number, allianceID)
-)
-`
+/*
+
+TODO: ADD FOREIGN KEY(reporter) REFERENCES users(username),
+
+*/
 
 const reportTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS reports
-(
-    id            SERIAL PRIMARY KEY,
-    reporter      TEXT NOT NULL,
-    allianceID    INT NOT NULL,
-    teamNumber    TEXT NOT NULL,
-    score         INT NOT NULL,
-    crossedLine   BOOLEAN,
-    deliveredGear BOOLEAN,
-    autoFuel      INT,
-    climbed       BOOLEAN,
-    gears         INT,
-    teleopFuel    INT,
-    FOREIGN KEY(allianceID) REFERENCES alliances(id)
+CREATE TABLE IF NOT EXISTS reports (
+	reporter TEXT NOT NULL,
+	eventKey TEXT NOT NULL,
+	matchKey TEXT NOT NULL,
+	isBlue BOOLEAN NOT NULL,
+	team TEXT NOT NULL,
+	stats TEXT NOT NULL,
+	UNIQUE(eventKey, matchKey, team),
+	FOREIGN KEY(eventKey) REFERENCES events(key),
+	FOREIGN KEY(matchKey) REFERENCES matches(key)
 )
 `
 
-const tbaModifiedTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS tbaModified
-(
-	name         TEXT PRIMARY KEY,
-	lastModified TEXT NOT NULL
-)
-`
-
-const usersTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS users
-(
-	username       TEXT NOT NULL UNIQUE,
+const userTableCreationQuery = `
+CREATE TABLE IF NOT EXISTS users (
+	username TEXT NOT NULL UNIQUE,
 	hashedPassword TEXT NOT NULL
 )
 `

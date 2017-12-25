@@ -6,19 +6,23 @@ import (
 	"github.com/Pigmice2733/scouting-backend/internal/store/match"
 )
 
-// Event holds data from TBA about an event.
-type Event struct {
-	Key     string        `json:"key"`
-	Name    string        `json:"name"`
-	Date    time.Time     `json:"date"`
-	Matches []match.Match `json:"matches,omitempty"`
+// BasicEvent holds basic information about an event, not including maches.
+type BasicEvent struct {
+	Key       string    `json:"key"`
+	Name      string    `json:"name"`
+	ShortName string    `json:"shortName"`
+	Date      time.Time `json:"date"`
 }
 
-// Service provides an interface for interacting with a store for events.
+// Event holds basic information about an event as well as matches.
+type Event struct {
+	BasicEvent
+	Matches []match.BasicMatch `json:"matches"`
+}
+
+// Service is a store for events.
 type Service interface {
-	Create(e Event) error
-	Get(key string) (Event, error)
-	GetEvents() ([]Event, error)
-	UpdateEvents(events []Event, handlers int) []error
-	Close() error
+	GetBasicEvents() ([]BasicEvent, error)
+	Get(key string, ms match.Service) (Event, error)
+	MassUpsert([]BasicEvent) error
 }

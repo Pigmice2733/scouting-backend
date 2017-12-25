@@ -1,16 +1,14 @@
 package user
 
-// User holds the credentials for a  user
+// User holds information about a user.
 type User struct {
 	Username       string `json:"username"`
-	HashedPassword string `json:"hashedPassword"`
+	HashedPassword string `json:"hashedPassowrd"`
 }
 
-// Service provides an interface for interacting with a store for users
+// Service is a store for users.
 type Service interface {
-	Create(User) error
 	Get(username string) (User, error)
-	GetUsers() ([]User, error)
+	Create(User) error
 	Delete(username string) error
-	Close() error
 }
