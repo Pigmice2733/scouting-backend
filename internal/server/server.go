@@ -54,7 +54,7 @@ func New(store *store.Service, logWriter io.Writer, tbaAPIKey, schemaPath string
 
 	// setup routes
 
-	s.handler = s.newRouter()
+	s.handler = corsMiddleware(s.newRouter())
 
 	// setup jwt secret
 
@@ -140,6 +140,14 @@ func (s *Server) newRouter() *mux.Router {
 	router.HandleFunc("/analysis/{eventKey}/{matchKey}/{color}", s.allianceAnalysisHandler).Methods("GET")
 
 	return router
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 const tbaURL = "http://www.thebluealliance.com/api/v3"
