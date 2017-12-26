@@ -11,6 +11,7 @@ Some environment variables are needed to tell the app what to connect to.
 - PG_DB_NAME: postgres database name
 - PG_SSL_MODE: postgres ssl mode
 - TBA_API_KEY: the blue alliance api key
+- SCHEMA_PATH: path to the report schema
 - HTTP_ADDR: http address
 - HTTPS_ADDR: https address
 - CERT_FILE: path to ssl certificate file
