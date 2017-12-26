@@ -43,6 +43,10 @@ func Analyze(eventKey string, teams []string, schema analysis.Schema, rs report.
 			return nil, fmt.Errorf("getting stats by event and team: %v", err)
 		}
 
+		if len(stats) == 0 {
+			return []TeamAnalysis{}, nil
+		}
+
 		results, err := analysis.Average(schema, stats...)
 		if err != nil {
 			return nil, fmt.Errorf("averaging statistics: %v", err)

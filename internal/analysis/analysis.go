@@ -87,6 +87,9 @@ func Average(schema Schema, data ...Data) (Results, error) {
 					return results, fmt.Errorf("analysis: data type '%T' of field '%v' does not match schema type '%v'", datum[k], datum[k], v)
 				}
 			}
+
+		default:
+			return results, fmt.Errorf("analysis: unsupported schema type")
 		}
 
 		results[k] = sum / float64(len(data))

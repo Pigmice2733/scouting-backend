@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Pigmice2733/scouting-backend/internal/analysis"
 	"github.com/Pigmice2733/scouting-backend/internal/respond"
 	"github.com/Pigmice2733/scouting-backend/internal/server/logic"
-	"github.com/Pigmice2733/scouting-backend/internal/store"
 	"github.com/gorilla/mux"
 )
 
@@ -19,13 +19,9 @@ func (s *Server) eventAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := logic.EventAnalysis(eventKey, s.schema, s.store.Report)
 	if err != nil {
-		if err == store.ErrNoResults {
-			resp = resp[:0]
-		} else {
-			s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
+		s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	respond.JSON(w, resp)
@@ -37,20 +33,17 @@ func (s *Server) teamAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := logic.Analyze(eventKey, []string{team}, s.schema, s.store.Report)
 	if err != nil {
-		if err == store.ErrNoResults {
-			resp = resp[:0]
-		} else {
-			s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
+		s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
-	if len(resp) > 0 {
-		respond.JSON(w, resp[0].Stats)
-	} else {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	if len(resp) == 0 {
+		respond.JSON(w, analysis.Results{})
+		return
 	}
+
+	respond.JSON(w, resp[0].Stats)
 }
 
 func (s *Server) allianceAnalysisHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,13 +52,9 @@ func (s *Server) allianceAnalysisHandler(w http.ResponseWriter, r *http.Request)
 
 	resp, err := logic.AllianceAnalysis(eventKey, matchKey, color, s.schema, s.store.Report)
 	if err != nil {
-		if err == store.ErrNoResults {
-			resp = resp[:0]
-		} else {
-			s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
+		s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	respond.JSON(w, resp)

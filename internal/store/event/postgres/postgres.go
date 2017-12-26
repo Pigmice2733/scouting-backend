@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 
+	"github.com/Pigmice2733/scouting-backend/internal/store"
 	"github.com/Pigmice2733/scouting-backend/internal/store/event"
 	"github.com/Pigmice2733/scouting-backend/internal/store/match"
 )
@@ -44,7 +45,9 @@ func (s *Service) Get(key string, ms match.Service) (e event.Event, err error) {
 
 	err = s.db.QueryRow("SELECT name, date, shortName FROM events WHERE key = $1", key).Scan(
 		&e.Name, &e.Date, &e.ShortName)
-	if err != nil {
+	if err == sql.ErrNoRows {
+		return e, store.ErrNoResults
+	} else if err != nil {
 		return e, err
 	}
 
