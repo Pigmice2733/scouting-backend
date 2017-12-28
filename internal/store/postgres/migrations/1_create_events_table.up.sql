@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS events (
+	key TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	shortName TEXT,
+	date TIMESTAMPTZ NOT NULL
+)

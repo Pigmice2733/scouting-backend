@@ -7,12 +7,17 @@ import (
 	"github.com/Pigmice2733/scouting-backend/internal/store"
 	eventPostgres "github.com/Pigmice2733/scouting-backend/internal/store/event/postgres"
 	matchPostgres "github.com/Pigmice2733/scouting-backend/internal/store/match/postgres"
+	"github.com/Pigmice2733/scouting-backend/internal/store/postgres/migrations"
 
 	alliancePostgres "github.com/Pigmice2733/scouting-backend/internal/store/alliance/postgres"
 	reportPostgres "github.com/Pigmice2733/scouting-backend/internal/store/report/postgres"
 	userPostgres "github.com/Pigmice2733/scouting-backend/internal/store/user/postgres"
 	// for the postgres sql driver
 	_ "github.com/lib/pq"
+
+	"github.com/mattes/migrate"
+	"github.com/mattes/migrate/database/postgres"
+	"github.com/mattes/migrate/source/go-bindata"
 )
 
 // Options holds information for connecting to a postgres instance
@@ -41,23 +46,27 @@ func NewFromOptions(options Options) (*store.Service, error) {
 
 // New returns a new Service.
 func New(db *sql.DB) (*store.Service, error) {
-	if _, err := db.Exec(eventTableCreationQuery); err != nil {
+	driver, err := postgres.WithInstance(db, &postgres.Config{MigrationsTable: "migrations", DatabaseName: "scoutingbackend"})
+	if err != nil {
+		return nil, fmt.Errorf("1: %v", err)
+	}
+
+	s := bindata.Resource(migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		})
+
+	d, err := bindata.WithInstance(s)
+	if err != nil {
 		return nil, err
 	}
 
-	if _, err := db.Exec(matchTableCreationQuery); err != nil {
-		return nil, err
+	m, err := migrate.NewWithInstance("go-bindata", d, "postgres", driver)
+	if err != nil {
+		return nil, fmt.Errorf("2: %v", err)
 	}
 
-	if _, err := db.Exec(allianceTableCreationQuery); err != nil {
-		return nil, err
-	}
-
-	if _, err := db.Exec(reportTableCreationQuery); err != nil {
-		return nil, err
-	}
-
-	if _, err := db.Exec(userTableCreationQuery); err != nil {
+	if err := m.Up(); err != migrate.ErrNoChange && err != nil {
 		return nil, err
 	}
 
@@ -69,62 +78,3 @@ func New(db *sql.DB) (*store.Service, error) {
 		User:     userPostgres.New(db),
 	}, nil
 }
-
-const eventTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS events (
-	key TEXT PRIMARY KEY,
-	name TEXT NOT NULL,
-	shortName TEXT,
-	date TIMESTAMPTZ NOT NULL
-)
-`
-
-const matchTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS matches (
-	key TEXT PRIMARY KEY,
-	eventKey TEXT NOT NULL,
-	predictedTime TIMESTAMPTZ,
-	actualTime TIMESTAMPTZ,
-	blueWon BOOLEAN,
-	redScore INTEGER,
-	blueScore INTEGER,
-	FOREIGN KEY(eventKey) REFERENCES events(key)
-)
-`
-
-const allianceTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS alliances (
-	matchKey TEXT NOT NULL,
-	isBlue BOOLEAN NOT NULL,
-	number TEXT NOT NULL,
-	FOREIGN KEY(matchKey) REFERENCES matches(key),
-	UNIQUE(matchKey, number)
-)
-`
-
-/*
-
-TODO: ADD FOREIGN KEY(reporter) REFERENCES users(username),
-
-*/
-
-const reportTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS reports (
-	reporter TEXT NOT NULL,
-	eventKey TEXT NOT NULL,
-	matchKey TEXT NOT NULL,
-	isBlue BOOLEAN NOT NULL,
-	team TEXT NOT NULL,
-	stats TEXT NOT NULL,
-	UNIQUE(eventKey, matchKey, team),
-	FOREIGN KEY(eventKey) REFERENCES events(key),
-	FOREIGN KEY(matchKey) REFERENCES matches(key)
-)
-`
-
-const userTableCreationQuery = `
-CREATE TABLE IF NOT EXISTS users (
-	username TEXT NOT NULL UNIQUE,
-	hashedPassword TEXT NOT NULL
-)
-`
