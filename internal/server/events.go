@@ -10,6 +10,8 @@ import (
 )
 
 func (s *Server) eventsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "max-age=86400") // 24 hour max age
+
 	bEvents, err := s.store.Event.GetBasicEvents()
 	if err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("getting basic events: %v", err))

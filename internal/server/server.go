@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
+	"github.com/fharding1/ezetag"
 
 	"github.com/Pigmice2733/scouting-backend/internal/analysis"
 	"github.com/Pigmice2733/scouting-backend/internal/logger"
@@ -54,7 +56,7 @@ func New(store *store.Service, logWriter io.Writer, tbaAPIKey, schemaPath string
 
 	// setup routes
 
-	s.handler = corsMiddleware(s.newRouter())
+	s.handler = corsMiddleware(cacheMiddleware(ezetag.Middleware(s.newRouter(), sha256.New)))
 
 	// setup jwt secret
 
@@ -145,6 +147,14 @@ func (s *Server) newRouter() *mux.Router {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func cacheMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overriden by /events
 
 		next.ServeHTTP(w, r)
 	})
