@@ -112,7 +112,6 @@ Gets a complete match.
   "key": "2017nhfoc_f1m1",
   "predictedTime": "2017-07-29T15:20:00Z",
   "actualTime": "2017-07-29T15:20:42Z",
-  "blueWon": true,
   "redScore": 508,
   "blueScore": 342,
   "redAlliance": [ "frc1011", "frc5499", "frc973" ],
@@ -132,8 +131,6 @@ The request body can change depending on the schema and data to analyze for the 
 
 ```json
 {
-  "reporter": "frank",
-  "isBlue": true,
   "team": "frc2733",
   "stats": {
     "climbed": true,
@@ -156,21 +153,27 @@ The response body can change depending on the schema and data to analyze.
 [
   {
     "team": "frc254",
-    "climbed": 0.94,
-    "movedBunnies": 7.4,
-    "movedBuckets": 14.2
+    "stats": {
+      "climbed": 0.94,
+      "movedBunnies": 7.4,
+      "movedBuckets": 14.2
+    }
   },
   {
     "team": "frc2733",
-    "climbed": 1,
-    "movedBunnies": 68.6,
-    "movedBuckets": 52.3
+    "stats": {
+      "climbed": 1,
+      "movedBunnies": 68.6,
+      "movedBuckets": 52.3
+    }
   },
   {
     "team": "frc2471",
-    "climbed": 1,
-    "movedBunnies": 67.6,
-    "movedBuckets": 51.3
+    "stats": {
+      "climbed": 1,
+      "movedBunnies": 67.6,
+      "movedBuckets": 51.3
+    }
   }
 ]
 ```
@@ -207,21 +210,27 @@ The response body can change depending on the schema and data to analyze.
 [
   {
     "team": "frc254",
-    "climbed": 0.94,
-    "movedBunnies": 7.4,
-    "movedBuckets": 14.2
+    "stats": {
+      "climbed": 0.94,
+      "movedBunnies": 7.4,
+      "movedBuckets": 14.2
+    }
   },
   {
     "team": "frc2733",
-    "climbed": 1,
-    "movedBunnies": 68.6,
-    "movedBuckets": 52.3
+    "stats": {
+      "climbed": 1,
+      "movedBunnies": 68.6,
+      "movedBuckets": 52.3
+    }
   },
   {
     "team": "frc2471",
-    "climbed": 1,
-    "movedBunnies": 67.6,
-    "movedBuckets": 51.3
+    "stats": {
+      "climbed": 1,
+      "movedBunnies": 67.6,
+      "movedBuckets": 51.3
+    }
   }
 ]
 ```

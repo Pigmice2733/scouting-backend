@@ -159,8 +159,6 @@ func GetMatches(tbaURL, tbaKey, eventKey string) ([]match.Match, error) {
 			actualMatchTime = time.Time{}
 		}
 
-		blueWon := tbaMatch.WinningAlliance == "blue"
-
 		bMatches = append(bMatches, match.Match{
 			BasicMatch: match.BasicMatch{
 				Key:           tbaMatch.Key,
@@ -168,7 +166,6 @@ func GetMatches(tbaURL, tbaKey, eventKey string) ([]match.Match, error) {
 				PredictedTime: predictedMatchTime.UTC(),
 				ActualTime:    actualMatchTime.UTC(),
 			},
-			BlueWon:      &blueWon,
 			RedScore:     tbaMatch.Alliances.Red.Score,
 			BlueScore:    tbaMatch.Alliances.Blue.Score,
 			RedAlliance:  tbaMatch.Alliances.Red.Teams,
