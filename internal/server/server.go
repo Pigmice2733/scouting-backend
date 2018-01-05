@@ -56,7 +56,7 @@ func New(store *store.Service, logWriter io.Writer, tbaAPIKey, schemaPath string
 
 	// setup routes
 
-	s.handler = corsMiddleware(cacheMiddleware(ezetag.Middleware(s.newRouter(), sha256.New)))
+	s.handler = s.newRouter()
 
 	// setup jwt secret
 
@@ -122,29 +122,39 @@ func (s *Server) Run(httpAddr, httpsAddr string) error {
 	return err
 }
 
+func mw(handlerFunc http.HandlerFunc, middlewares ...func(http.Handler) http.Handler) http.Handler {
+	h := http.Handler(handlerFunc)
+
+	for _, middleware := range middlewares {
+		h = middleware(h)
+	}
+
+	return h
+}
+
 func (s *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/authenticate", s.authenticateHandler)
-	router.Handle("/users", s.authHandler(http.HandlerFunc(s.createUserHandler)))
-	router.Handle("/users/{username}", s.authHandler(http.HandlerFunc(s.deleteUserHandler)))
+	router.Handle("/authenticate", mw(s.authenticateHandler, cors)).Methods("POST")
+	router.Handle("/users", mw(s.createUserHandler, s.authHandler, cors)).Methods("POST")
+	router.Handle("/users/{username}", mw(s.deleteUserHandler, s.authHandler, cors)).Methods("DELETE")
 
-	router.HandleFunc("/events", s.eventsHandler).Methods("GET")
-	router.Handle("/events/{eventKey}", s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler))).Methods("GET")
-	router.Handle("/events/{eventKey}/{matchKey}", s.pollMatchMiddleware(http.HandlerFunc(s.matchHandler))).Methods("GET")
+	router.Handle("/events", mw(s.eventsHandler, stdMiddleware)).Methods("GET")
+	router.Handle("/events/{eventKey}", mw(s.eventHandler, s.pollMatchMiddleware, stdMiddleware)).Methods("GET")
+	router.Handle("/events/{eventKey}/{matchKey}", mw(s.matchHandler, s.pollMatchMiddleware, stdMiddleware)).Methods("GET")
 
-	router.Handle("/reports/{eventKey}/{matchKey}", s.authHandler(http.HandlerFunc(s.reportHandler))).Methods("PUT")
+	router.Handle("/reports/{eventKey}/{matchKey}", mw(s.reportHandler, s.authHandler, cors)).Methods("PUT")
 
-	router.HandleFunc("/schema", s.schemaHandler).Methods("GET")
+	router.Handle("/schema", mw(s.schemaHandler, stdMiddleware)).Methods("GET")
 
-	router.HandleFunc("/analysis/{eventKey}", s.eventAnalysisHandler).Methods("GET")
-	router.HandleFunc("/analysis/{eventKey}/{team}", s.teamAnalysisHandler).Methods("GET")
-	router.HandleFunc("/analysis/{eventKey}/{matchKey}/{color}", s.allianceAnalysisHandler).Methods("GET")
+	router.Handle("/analysis/{eventKey}", mw(s.eventAnalysisHandler, stdMiddleware)).Methods("GET")
+	router.Handle("/analysis/{eventKey}/{team}", mw(s.teamAnalysisHandler, stdMiddleware)).Methods("GET")
+	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", mw(s.allianceAnalysisHandler, stdMiddleware)).Methods("GET")
 
 	return router
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -152,12 +162,16 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func cacheMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func cache(next http.Handler) http.Handler {
+	return ezetag.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overriden by /events
 
 		next.ServeHTTP(w, r)
-	})
+	}), sha256.New)
+}
+
+func stdMiddleware(next http.Handler) http.Handler {
+	return cors(cache(next))
 }
 
 const tbaURL = "http://www.thebluealliance.com/api/v3"
