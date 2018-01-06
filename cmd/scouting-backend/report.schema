@@ -1,5 +1,11 @@
 {
+	"cubesInVault": "number",
+	"activatedLevitate": "bool",
+	"activatedForce": "bool",
+	"activatedBoost": "bool",
+	"cubesOnScale": "number",
+	"cubesOnSwitch": "number",
 	"climbed": "bool",
-	"movedBunnies": "number",
-	"movedBuckets": "number"
+	"cubesIntoExchange": "number",
+	"crossedLineInAuto": "number"
 }
