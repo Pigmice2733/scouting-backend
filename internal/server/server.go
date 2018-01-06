@@ -151,6 +151,10 @@ func cors(next http.Handler, allowedMethods []string) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", strings.Join(append(allowedMethods, "OPTIONS"), ","))
 
+		if r.Method != "GET" {
+			w.Header().Set("Access-Control-Allow-Headers", "Authentication")
+		}
+
 		if r.Method == "OPTIONS" {
 			return
 		} else if !existsIn(r.Method, allowedMethods) {
