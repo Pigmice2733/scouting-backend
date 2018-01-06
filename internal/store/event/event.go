@@ -11,6 +11,7 @@ type BasicEvent struct {
 	Key       string    `json:"key"`
 	Name      string    `json:"name"`
 	ShortName string    `json:"shortName"`
+	EventType int       `json:"eventType"`
 	Date      time.Time `json:"date"`
 }
 

@@ -22,7 +22,7 @@ func New(db *sql.DB) event.Service {
 func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
 	var bEvents []event.BasicEvent
 
-	rows, err := s.db.Query("SELECT key, name, date, shortName FROM events")
+	rows, err := s.db.Query("SELECT key, name, date, shortName, eventType FROM events")
 	if err != nil {
 		return bEvents, err
 	}
@@ -30,7 +30,7 @@ func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
 
 	for rows.Next() {
 		var bEvent event.BasicEvent
-		if err := rows.Scan(&bEvent.Key, &bEvent.Name, &bEvent.Date, &bEvent.ShortName); err != nil {
+		if err := rows.Scan(&bEvent.Key, &bEvent.Name, &bEvent.Date, &bEvent.ShortName, &bEvent.EventType); err != nil {
 			return nil, err
 		}
 		bEvents = append(bEvents, bEvent)
@@ -43,8 +43,8 @@ func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
 func (s *Service) Get(key string, ms match.Service) (e event.Event, err error) {
 	e.Key = key
 
-	err = s.db.QueryRow("SELECT name, date, shortName FROM events WHERE key = $1", key).Scan(
-		&e.Name, &e.Date, &e.ShortName)
+	err = s.db.QueryRow("SELECT name, date, shortName, eventType FROM events WHERE key = $1", key).Scan(
+		&e.Name, &e.Date, &e.ShortName, &e.EventType)
 	if err == sql.ErrNoRows {
 		return e, store.ErrNoResults
 	} else if err != nil {
@@ -60,12 +60,12 @@ func (s *Service) Get(key string, ms match.Service) (e event.Event, err error) {
 // MassUpsert upserts multiple events in the postgres database.
 func (s *Service) MassUpsert(bEvents []event.BasicEvent) error {
 	stmt, err := s.db.Prepare(`
-		INSERT INTO events (key, name, shortName, date)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO events (key, name, shortName, date, eventType)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (key)
 		DO
 			UPDATE
-				SET name = $2, shortName = $3, date = $4
+				SET name = $2, shortName = $3, date = $4, eventType = $5
 		`)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (s *Service) MassUpsert(bEvents []event.BasicEvent) error {
 	defer stmt.Close()
 
 	for _, bEvent := range bEvents {
-		if _, err := stmt.Exec(bEvent.Key, bEvent.Name, bEvent.ShortName, bEvent.Date); err != nil {
+		if _, err := stmt.Exec(bEvent.Key, bEvent.Name, bEvent.ShortName, bEvent.Date, bEvent.EventType); err != nil {
 			return err
 		}
 	}

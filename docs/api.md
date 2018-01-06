@@ -25,7 +25,8 @@ For retrieving a JWT token for authenticated requests.
 
 ```json
 {
-  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTMyMTA0OTksInN1YiI6ImZyYW5rIn0.HCwmwj0f-4b2I-hK9QEJ-4berztETH_IDgcSIJBPXMI"
+  "jwt":
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTMyMTA0OTksInN1YiI6ImZyYW5rIn0.HCwmwj0f-4b2I-hK9QEJ-4berztETH_IDgcSIJBPXMI"
 }
 ```
 
@@ -64,13 +65,15 @@ Gets all (basic) events.
     "key": "2017alhu",
     "name": "Rocket City Regional",
     "shortName": "Rocket City",
-    "date": "2017-03-21T17:00:00-07:00"
+    "date": "2017-03-21T17:00:00-07:00",
+    "eventType": 0,
   },
   {
     "key": "2017code",
     "name": "Colorado Regional",
     "shortName": "Colorado",
-    "date": "2017-03-21T17:00:00-07:00"
+    "date": "2017-03-21T17:00:00-07:00",
+    "eventType": 0,
   },
   ...
 ]
@@ -88,6 +91,7 @@ Gets a complete event including matches.
   "name": "FIRST Festival of Champions",
   "shortName": "FIRST Festival of Champions",
   "date": "2017-07-28T17:00:00-07:00",
+  "eventType": 0,
   "matches": [
     {
       "key": "2017nhfoc_f1m1",
@@ -114,8 +118,8 @@ Gets a complete match.
   "actualTime": "2017-07-29T15:20:42Z",
   "redScore": 508,
   "blueScore": 342,
-  "redAlliance": [ "frc1011", "frc5499", "frc973" ],
-  "blueAlliance": [ "frc1011", "frc5499", "frc973" ]
+  "redAlliance": ["frc1011", "frc5499", "frc973"],
+  "blueAlliance": ["frc1011", "frc5499", "frc973"]
 }
 ```
 
@@ -139,6 +143,7 @@ The request body can change depending on the schema and data to analyze for the 
   }
 }
 ```
+
 ---
 
 ## /analysis/{eventKey} - GET
