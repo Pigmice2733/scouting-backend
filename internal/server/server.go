@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
 	"github.com/fharding1/ezetag"
 
@@ -134,7 +135,7 @@ func (s *Server) newRouter() *mux.Router {
 	router.Handle("/events/{eventKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler))))
 	router.Handle("/events/{eventKey}/{matchKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.matchHandler))))
 
-	router.Handle("/reports/{eventKey}/{matchKey}", cors(s.authHandler(http.HandlerFunc(s.reportHandler)), []string{"POST"}))
+	router.Handle("/reports/{eventKey}/{matchKey}", cors(s.authHandler(http.HandlerFunc(s.reportHandler)), []string{"PUT"}))
 
 	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler)))
 
@@ -171,11 +172,11 @@ func existsIn(str string, strs []string) bool {
 }
 
 func cache(next http.Handler) http.Handler {
-	return ezetag.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return gziphandler.GzipHandler(ezetag.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overriden by /events
 
 		next.ServeHTTP(w, r)
-	}), sha256.New)
+	}), sha256.New))
 }
 
 func stdMiddleware(next http.Handler) http.Handler {
