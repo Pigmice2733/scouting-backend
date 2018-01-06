@@ -16,6 +16,12 @@ func New(db *sql.DB) alliance.Service {
 	return &Service{db: db}
 }
 
+// GetColor retrieves the color of the alliance given a matchKey and number.
+func (s *Service) GetColor(matchKey string, number string) (isBlue bool, err error) {
+	err = s.db.QueryRow("SELECT isBlue FROM alliances WHERE matchKey = $1 AND number = $2", matchKey, number).Scan(&isBlue)
+	return
+}
+
 // Get gets a certain alliance given a matchKey and whether they were blue or red.
 func (s *Service) Get(matchKey string, isBlue bool) (alliance.Alliance, error) {
 	alliances := make(alliance.Alliance, 0)

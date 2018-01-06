@@ -30,7 +30,7 @@ func (s *Server) reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.Report.Upsert(rep); err != nil {
+	if err := s.store.Report.Upsert(rep, s.store.Alliance); err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("upserting report: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

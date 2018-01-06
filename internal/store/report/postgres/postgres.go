@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/Pigmice2733/scouting-backend/internal/analysis"
+	"github.com/Pigmice2733/scouting-backend/internal/store/alliance"
 	"github.com/Pigmice2733/scouting-backend/internal/store/report"
 )
 
@@ -20,20 +21,25 @@ func New(db *sql.DB) report.Service {
 }
 
 // Upsert upserts (creates if the resource doesn't exist, otherwise updates) a report into the postgresql database.
-func (s *Service) Upsert(rep report.Report) error {
+func (s *Service) Upsert(rep report.Report, as alliance.Service) error {
 	stats := new(bytes.Buffer)
 	if err := json.NewEncoder(stats).Encode(rep.Stats); err != nil {
 		return err
 	}
 
-	_, err := s.db.Exec(`
+	isBlue, err := as.GetColor(rep.MatchKey, rep.Team)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(`
 		INSERT INTO reports (reporter, isBlue, team, stats, eventKey, matchKey)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (eventKey, matchKey, team)
 		DO
 			UPDATE
 				SET reporter = $1, isBlue = $2, team = $3, stats = $4
-	`, rep.Reporter, rep.IsBlue, rep.Team, stats.String(), rep.EventKey, rep.MatchKey)
+	`, rep.Reporter, isBlue, rep.Team, stats.String(), rep.EventKey, rep.MatchKey)
 	return err
 }
 
