@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
@@ -122,44 +123,51 @@ func (s *Server) Run(httpAddr, httpsAddr string) error {
 	return err
 }
 
-func mw(handlerFunc http.HandlerFunc, middlewares ...func(http.Handler) http.Handler) http.Handler {
-	h := http.Handler(handlerFunc)
-
-	for _, middleware := range middlewares {
-		h = middleware(h)
-	}
-
-	return h
-}
-
 func (s *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 
-	router.Handle("/authenticate", mw(s.authenticateHandler, cors)).Methods("POST")
-	router.Handle("/users", mw(s.createUserHandler, s.authHandler, cors)).Methods("POST")
-	router.Handle("/users/{username}", mw(s.deleteUserHandler, s.authHandler, cors)).Methods("DELETE")
+	router.Handle("/authenticate", cors(http.HandlerFunc(s.authenticateHandler), []string{"POST"}))
+	router.Handle("/users", cors(s.authHandler(http.HandlerFunc(s.createUserHandler)), []string{"POST"}))
+	router.Handle("/users/{username}", cors(s.authHandler(http.HandlerFunc(s.deleteUserHandler)), []string{"DELETE"}))
 
-	router.Handle("/events", mw(s.eventsHandler, stdMiddleware)).Methods("GET")
-	router.Handle("/events/{eventKey}", mw(s.eventHandler, s.pollMatchMiddleware, stdMiddleware)).Methods("GET")
-	router.Handle("/events/{eventKey}/{matchKey}", mw(s.matchHandler, s.pollMatchMiddleware, stdMiddleware)).Methods("GET")
+	router.Handle("/events", stdMiddleware(http.HandlerFunc(s.eventsHandler)))
+	router.Handle("/events/{eventKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler))))
+	router.Handle("/events/{eventKey}/{matchKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.matchHandler))))
 
-	router.Handle("/reports/{eventKey}/{matchKey}", mw(s.reportHandler, s.authHandler, cors)).Methods("PUT")
+	router.Handle("/reports/{eventKey}/{matchKey}", cors(s.authHandler(http.HandlerFunc(s.reportHandler)), []string{"POST"}))
 
-	router.Handle("/schema", mw(s.schemaHandler, stdMiddleware)).Methods("GET")
+	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler)))
 
-	router.Handle("/analysis/{eventKey}", mw(s.eventAnalysisHandler, stdMiddleware)).Methods("GET")
-	router.Handle("/analysis/{eventKey}/{team}", mw(s.teamAnalysisHandler, stdMiddleware)).Methods("GET")
-	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", mw(s.allianceAnalysisHandler, stdMiddleware)).Methods("GET")
+	router.Handle("/analysis/{eventKey}", stdMiddleware(http.HandlerFunc(s.eventAnalysisHandler)))
+	router.Handle("/analysis/{eventKey}/{team}", stdMiddleware(http.HandlerFunc(s.teamAnalysisHandler)))
+	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", stdMiddleware(http.HandlerFunc(s.allianceAnalysisHandler)))
 
 	return router
 }
 
-func cors(next http.Handler) http.Handler {
+func cors(next http.Handler, allowedMethods []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ","))
+
+		if r.Method == "OPTIONS" {
+			return
+		} else if !existsIn(r.Method, allowedMethods) {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func existsIn(str string, strs []string) bool {
+	for _, s := range strs {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }
 
 func cache(next http.Handler) http.Handler {
@@ -171,7 +179,7 @@ func cache(next http.Handler) http.Handler {
 }
 
 func stdMiddleware(next http.Handler) http.Handler {
-	return cors(cache(next))
+	return cors(cache(next), []string{"GET"})
 }
 
 func (s *Server) pollEvents() {

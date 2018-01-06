@@ -16,8 +16,6 @@ func (s *Server) reportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	
-	w.Header().Set("Access-Control-Allow-Methods", "PUT")
 
 	vars := mux.Vars(r)
 	rep.EventKey, rep.MatchKey = vars["eventKey"], vars["matchKey"]
