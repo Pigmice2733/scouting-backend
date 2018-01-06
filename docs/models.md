@@ -89,12 +89,11 @@ See [Match](#match)
 
 ### Go
 
-| Name         | Type                            | Tags      | Example                            |
-| ------------ | ------------------------------- | --------- | ---------------------------------- |
-|              | [match.BasicMatch](#basicmatch) |           | See [BasicMatch](#basicmatch)      |
-| BlueWon      | \*bool                          | omitempty | true                               |
-| RedAlliance  | []string                        |           | [ "frc1011", "frc5499", "frc973" ] |
-| BlueAlliance | []string                        |           | [ "frc1011", "frc5499", "frc973" ] |
+| Name         | Type                            | Tags | Example                            |
+| ------------ | ------------------------------- | ---- | ---------------------------------- |
+|              | [match.BasicMatch](#basicmatch) |      | See [BasicMatch](#basicmatch)      |
+| RedAlliance  | []string                        |      | [ "frc1011", "frc5499", "frc973" ] |
+| BlueAlliance | []string                        |      | [ "frc1011", "frc5499", "frc973" ] |
 
 ### PostgreSQL
 
@@ -104,7 +103,6 @@ See [Match](#match)
 | eventKey      | TEXT NOT NULL    | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"                     |
 | predictedTime | TIMESTAMPTZ      |                                              | 2017-04-21 17:00:00 -0700 -0700 |
 | actualTime    | TIMESTAMPTZ      |                                              | 2017-04-21 17:00:00 -0700 -0700 |
-| blueWon       | BOOLEAN          |                                              | true                            |
 | redScore      | INTEGER          |                                              | 83                              |
 | blueScore     | INTEGER          |                                              | 96                              |
 
@@ -115,7 +113,6 @@ See [Match](#match)
 | key           | string          |               | "2017cmptx_sf1m13"                 |
 | predictedTime | int (UNIX TIME) | Omit if empty | 1512764281                         |
 | actualTime    | int (UNIX TIME) | Omit if empty | 1512764281                         |
-| blueWon       | bool            | Omit if empty | true                               |
 | blueAlliance  | []string        |               | [ "frc1011", "frc5499", "frc973" ] |
 | redAlliance   | []string        |               | [ "frc1011", "frc5499", "frc973" ] |
 

@@ -146,29 +146,28 @@ func GetMatches(tbaKey, eventKey string) ([]match.Match, error) {
 
 	var bMatches []match.Match
 	for _, tbaMatch := range tbaMatches {
-		var predictedMatchTime time.Time
-		var actualMatchTime time.Time
+		var predictedMatchTime *time.Time
+		var actualMatchTime *time.Time
 
 		if tbaMatch.PredictedTime != 0 {
-			predictedMatchTime = time.Unix(tbaMatch.PredictedTime, 0)
+			predictedTime := time.Unix(tbaMatch.PredictedTime, 0)
+			predictedMatchTime = &predictedTime
 		} else if tbaMatch.ScheduledTime != 0 {
-			predictedMatchTime = time.Unix(tbaMatch.ScheduledTime, 0)
-		} else {
-			predictedMatchTime = time.Time{}
+			scheduledTime := time.Unix(tbaMatch.ScheduledTime, 0)
+			predictedMatchTime = &scheduledTime
 		}
 
 		if tbaMatch.ActualTime != 0 {
-			actualMatchTime = time.Unix(tbaMatch.ActualTime, 0)
-		} else {
-			actualMatchTime = time.Time{}
+			actualTime := time.Unix(tbaMatch.ActualTime, 0)
+			actualMatchTime = &actualTime
 		}
 
 		bMatches = append(bMatches, match.Match{
 			BasicMatch: match.BasicMatch{
 				Key:           tbaMatch.Key,
 				EventKey:      eventKey,
-				PredictedTime: predictedMatchTime.UTC(),
-				ActualTime:    actualMatchTime.UTC(),
+				PredictedTime: predictedMatchTime,
+				ActualTime:    actualMatchTime,
 			},
 			RedScore:     tbaMatch.Alliances.Red.Score,
 			BlueScore:    tbaMatch.Alliances.Blue.Score,

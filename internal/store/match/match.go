@@ -8,10 +8,10 @@ import (
 
 // BasicMatch holds basic information about a match excluding alliances.
 type BasicMatch struct {
-	Key           string    `json:"key"`
-	EventKey      string    `json:"-"`
-	PredictedTime time.Time `json:"predictedTime,omitempty"`
-	ActualTime    time.Time `json:"actualTime,omitempty"`
+	Key           string     `json:"key"`
+	EventKey      string     `json:"-"`
+	PredictedTime *time.Time `json:"predictedTime,omitempty"`
+	ActualTime    *time.Time `json:"actualTime,omitempty"`
 }
 
 // Match holds basic match information and alliance info for the match.
