@@ -35,12 +35,15 @@ func (lmm *lastModifiedManager) Set(path, lastModified string) {
 
 var lastModified = lastModifiedManager{make(map[string]string), new(sync.Mutex)}
 
+const tbaURL = "http://www.thebluealliance.com/api/v3"
+
 // GetEvents retrieves all associated events from the blue alliance API.
-func GetEvents(tbaURL, tbaKey string, year int) ([]event.BasicEvent, error) {
+func GetEvents(tbaKey string, year int) ([]event.BasicEvent, error) {
 	type tbaEvent struct {
 		Key       string `json:"key"`
 		Name      string `json:"name"`
 		ShortName string `json:"short_name"`
+		EventType int    `json:"event_type"`
 		Date      string `json:"start_date"`
 	}
 
@@ -83,6 +86,7 @@ func GetEvents(tbaURL, tbaKey string, year int) ([]event.BasicEvent, error) {
 			Key:       tbaEvent.Key,
 			Name:      tbaEvent.Name,
 			ShortName: tbaEvent.ShortName,
+			EventType: tbaEvent.EventType,
 			Date:      startDate,
 		})
 	}
@@ -93,7 +97,7 @@ func GetEvents(tbaURL, tbaKey string, year int) ([]event.BasicEvent, error) {
 }
 
 // GetMatches retrieves all associated matches from the blue alliance API.
-func GetMatches(tbaURL, tbaKey, eventKey string) ([]match.Match, error) {
+func GetMatches(tbaKey, eventKey string) ([]match.Match, error) {
 	type tbaMatch struct {
 		Key             string `json:"key"`
 		ScheduledTime   int64  `json:"time"`

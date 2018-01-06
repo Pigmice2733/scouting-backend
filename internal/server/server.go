@@ -174,10 +174,8 @@ func stdMiddleware(next http.Handler) http.Handler {
 	return cors(cache(next))
 }
 
-const tbaURL = "http://www.thebluealliance.com/api/v3"
-
 func (s *Server) pollEvents() {
-	bEvents, err := tba.GetEvents(tbaURL, s.tbaAPIKey, time.Now().Year())
+	bEvents, err := tba.GetEvents(s.tbaAPIKey, time.Now().Year())
 	if err == tba.ErrNotModified {
 		return
 	} else if err != nil {
@@ -191,7 +189,7 @@ func (s *Server) pollEvents() {
 }
 
 func (s *Server) pollMatches(eventKey string) {
-	matches, err := tba.GetMatches(tbaURL, s.tbaAPIKey, eventKey)
+	matches, err := tba.GetMatches(s.tbaAPIKey, eventKey)
 	if err == tba.ErrNotModified {
 		return
 	} else if err != nil {
