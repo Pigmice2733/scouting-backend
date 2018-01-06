@@ -149,7 +149,7 @@ func (s *Server) newRouter() *mux.Router {
 func cors(next http.Handler, allowedMethods []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ","))
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(append(allowedMethods, "OPTIONS"), ","))
 
 		if r.Method == "OPTIONS" {
 			return
