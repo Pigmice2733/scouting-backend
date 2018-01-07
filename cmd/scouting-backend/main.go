@@ -12,8 +12,8 @@ import (
 func main() {
 	port, err := strconv.Atoi(os.Getenv("PG_PORT"))
 	if err != nil {
-		fmt.Printf("unable to parse 'PG_PORT': %v\n", err)
-		os.Exit(1)
+		port = 5432
+		fmt.Printf("PG_PORT defaulted to: %d\n", port)
 	}
 
 	store, err := postgres.NewFromOptions(postgres.Options{

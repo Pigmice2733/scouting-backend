@@ -68,8 +68,6 @@ func Average(schema Schema, data ...Data) (Results, error) {
 					sum += float64(value)
 				case float64:
 					sum += value
-				default:
-					return results, fmt.Errorf("analysis: data type '%T' of field '%v' does not match schema type '%v'", datum[k], datum[k], v)
 				}
 			}
 
@@ -83,8 +81,6 @@ func Average(schema Schema, data ...Data) (Results, error) {
 				switch value := val.(type) {
 				case bool:
 					sum += float64(btoi(value))
-				default:
-					return results, fmt.Errorf("analysis: data type '%T' of field '%v' does not match schema type '%v'", datum[k], datum[k], v)
 				}
 			}
 
