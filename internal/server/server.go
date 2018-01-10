@@ -2,9 +2,10 @@ package server
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
 	"net/http"
 	"os"
@@ -175,12 +176,16 @@ func existsIn(str string, strs []string) bool {
 	return false
 }
 
+var castagoliTable = crc32.MakeTable(crc32.Castagnoli)
+
 func cache(next http.Handler) http.Handler {
 	return gziphandler.GzipHandler(ezetag.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overriden by /events
 
 		next.ServeHTTP(w, r)
-	}), sha256.New))
+	}), func() hash.Hash {
+		return crc32.New(castagoliTable)
+	}))
 }
 
 func stdMiddleware(next http.Handler) http.Handler {
