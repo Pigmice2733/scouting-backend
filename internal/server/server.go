@@ -140,9 +140,9 @@ func (s *Server) newRouter() *mux.Router {
 
 	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler)))
 
-	router.Handle("/analysis/{eventKey}", stdMiddleware(http.HandlerFunc(s.eventAnalysisHandler)))
-	router.Handle("/analysis/{eventKey}/{team}", stdMiddleware(http.HandlerFunc(s.teamAnalysisHandler)))
-	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", stdMiddleware(http.HandlerFunc(s.allianceAnalysisHandler)))
+	router.Handle("/analysis/{eventKey}", cors(http.HandlerFunc(s.eventAnalysisHandler), []string{"GET"}))
+	router.Handle("/analysis/{eventKey}/{team}", cors(http.HandlerFunc(s.teamAnalysisHandler), []string{"GET"}))
+	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", cors(http.HandlerFunc(s.allianceAnalysisHandler), []string{"GET"}))
 
 	return router
 }
