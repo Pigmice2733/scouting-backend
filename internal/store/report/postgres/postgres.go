@@ -63,26 +63,6 @@ func (s *Service) GetReportedOn(eventKey string) (reportedOn []string, err error
 	return reportedOn, rows.Err()
 }
 
-// GetAllianceReportedOn gets all teams reported on at an event at a match of a certain color (blue or red).
-func (s *Service) GetAllianceReportedOn(eventKey, matchKey string, isBlue bool) (reportedOn []string, err error) {
-	rows, err := s.db.Query("SELECT team FROM reports WHERE eventKey = $1 AND matchKey = $2 AND isBlue = $3", eventKey, matchKey, isBlue)
-	if err != nil {
-		return reportedOn, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var team string
-		if err := rows.Scan(&team); err != nil {
-			return reportedOn, err
-		}
-
-		reportedOn = append(reportedOn, team)
-	}
-
-	return reportedOn, rows.Err()
-}
-
 // GetStatsByEventAndTeam gets all statistics from reports of a certain team at a certain event.
 func (s *Service) GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data, error) {
 	rows, err := s.db.Query("SELECT stats FROM reports WHERE eventKey = $1 AND team = $2", eventKey, team)

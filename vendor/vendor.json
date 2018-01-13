@@ -15,28 +15,10 @@
 			"revisionTime": "2017-10-19T21:57:19Z"
 		},
 		{
-			"checksumSHA1": "UptcFu62IFoR+6IDUUmBugjBpCE=",
-			"path": "github.com/didip/tollbooth",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
-		},
-		{
-			"checksumSHA1": "/MkoFe4J3RLhThVEDsd1qdJYEPo=",
-			"path": "github.com/didip/tollbooth/errors",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
-		},
-		{
-			"checksumSHA1": "KcyJkQS3ZUisCoWBalbyX+9voDs=",
-			"path": "github.com/didip/tollbooth/libstring",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
-		},
-		{
-			"checksumSHA1": "iJMSIis5g7/YWLYorIHNi55WW+s=",
-			"path": "github.com/didip/tollbooth/limiter",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
+			"checksumSHA1": "Zb2QgJqnb4EUxrj3IIM/csN9pLk=",
+			"path": "github.com/fharding1/ezetag",
+			"revision": "7caab29bf9933ad46344cd133bb8e3986e47673b",
+			"revisionTime": "2018-01-01T19:35:05Z"
 		},
 		{
 			"checksumSHA1": "IkPM2QLv9urri7S49wzroQx9oXA=",
@@ -63,11 +45,34 @@
 			"revisionTime": "2017-11-13T04:44:40Z"
 		},
 		{
-			"checksumSHA1": "B4MQSFtn9ip7g7pwzp4w5nAK+IE=",
-			"origin": "github.com/didip/tollbooth/vendor/github.com/patrickmn/go-cache",
-			"path": "github.com/patrickmn/go-cache",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
+			"checksumSHA1": "1eqaYFES2A5QPheHO/5y7f08hsU=",
+			"path": "github.com/mattes/migrate",
+			"revision": "d23f71b03c4a439b81ccccb2ac5090032ec5c735",
+			"revisionTime": "2017-12-08T21:48:26Z"
+		},
+		{
+			"checksumSHA1": "rgPaVMIKdtMG4iDs1IxWvkkC0as=",
+			"path": "github.com/mattes/migrate/database",
+			"revision": "d23f71b03c4a439b81ccccb2ac5090032ec5c735",
+			"revisionTime": "2017-12-08T21:48:26Z"
+		},
+		{
+			"checksumSHA1": "uhuNTzrlwpojJsex4gxSmcKLJLM=",
+			"path": "github.com/mattes/migrate/database/postgres",
+			"revision": "d23f71b03c4a439b81ccccb2ac5090032ec5c735",
+			"revisionTime": "2017-12-08T21:48:26Z"
+		},
+		{
+			"checksumSHA1": "NOHNHKXXQEDTkU7M1RZTXYKP9vo=",
+			"path": "github.com/mattes/migrate/source",
+			"revision": "d23f71b03c4a439b81ccccb2ac5090032ec5c735",
+			"revisionTime": "2017-12-08T21:48:26Z"
+		},
+		{
+			"checksumSHA1": "OoIIFm7KqI9NGT/sL6gQXPTULsE=",
+			"path": "github.com/mattes/migrate/source/go-bindata",
+			"revision": "d23f71b03c4a439b81ccccb2ac5090032ec5c735",
+			"revisionTime": "2017-12-08T21:48:26Z"
 		},
 		{
 			"checksumSHA1": "UWjVYmoHlIfHzVIskELHiJQtMOI=",
@@ -80,32 +85,7 @@
 			"path": "golang.org/x/crypto/blowfish",
 			"revision": "6a293f2d4b14b8e6d3f0539e383f6d0d30fce3fd",
 			"revisionTime": "2017-09-25T11:22:06Z"
-		},
-		{
-			"checksumSHA1": "iNE2KX9BQzCptlQC2DdQEVmn4R4=",
-			"path": "golang.org/x/crypto/sha3",
-			"revision": "6a293f2d4b14b8e6d3f0539e383f6d0d30fce3fd",
-			"revisionTime": "2017-09-25T11:22:06Z"
-		},
-		{
-			"checksumSHA1": "4VyY+6WyLtHNTDmCD5BOitlMhkk=",
-			"origin": "github.com/didip/tollbooth/vendor/golang.org/x/net/context",
-			"path": "golang.org/x/net/context",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
-		},
-		{
-			"checksumSHA1": "3kFlcvxULPbrcBKNLzy/lD4qSKI=",
-			"origin": "github.com/didip/tollbooth/vendor/golang.org/x/time/rate",
-			"path": "golang.org/x/time/rate",
-			"revision": "b65680a2d5f624ed528d36f8406f31535555828a",
-			"revisionTime": "2017-11-18T22:44:42Z"
 		}
 	],
-	"rootPath": "github.com/Pigmice2733/scouting-backend",
-	"heroku": {
-		"install": [
-			"./cmd/scouting-backend"
-		]
-	}
+	"rootPath": "github.com/Pigmice2733/scouting-backend"
 }

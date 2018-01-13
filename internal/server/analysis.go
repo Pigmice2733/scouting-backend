@@ -50,7 +50,7 @@ func (s *Server) allianceAnalysisHandler(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	eventKey, matchKey, color := vars["eventKey"], vars["matchKey"], vars["color"]
 
-	resp, err := logic.AllianceAnalysis(eventKey, matchKey, color, s.schema, s.store.Report)
+	resp, err := logic.AllianceAnalysis(eventKey, matchKey, color, s.schema, s.store.Report, s.store.Alliance)
 	if err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("analyzing event: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

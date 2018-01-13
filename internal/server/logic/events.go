@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Pigmice2733/scouting-backend/internal/analysis"
+	"github.com/Pigmice2733/scouting-backend/internal/store/alliance"
 	"github.com/Pigmice2733/scouting-backend/internal/store/report"
 )
 
@@ -24,13 +25,13 @@ func EventAnalysis(eventKey string, schema analysis.Schema, rs report.Service) (
 }
 
 // AllianceAnalysis gets information about how all teams at a certain event and match of a certain alliance performed.
-func AllianceAnalysis(eventKey, matchKey, color string, schema analysis.Schema, rs report.Service) ([]TeamAnalysis, error) {
-	reportedOn, err := rs.GetAllianceReportedOn(eventKey, matchKey, color == "blue")
+func AllianceAnalysis(eventKey, matchKey, color string, schema analysis.Schema, rs report.Service, as alliance.Service) ([]TeamAnalysis, error) {
+	teams, err := as.Get(matchKey, color == "blue")
 	if err != nil {
 		return nil, fmt.Errorf("getting teams on an alliance at a match reported on: %v", err)
 	}
 
-	return Analyze(eventKey, reportedOn, schema, rs)
+	return Analyze(eventKey, teams, schema, rs)
 }
 
 // Analyze gets statistics on how a team performed.
@@ -44,7 +45,7 @@ func Analyze(eventKey string, teams []string, schema analysis.Schema, rs report.
 		}
 
 		if len(stats) == 0 {
-			return []TeamAnalysis{}, nil
+			continue
 		}
 
 		results, err := analysis.Average(schema, stats...)

@@ -18,6 +18,5 @@ type Report struct {
 type Service interface {
 	Upsert(rep Report, as alliance.Service) error
 	GetReportedOn(eventKey string) ([]string, error)
-	GetAllianceReportedOn(eventKey, matchKey string, isBlue bool) ([]string, error)
 	GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data, error)
 }
