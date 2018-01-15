@@ -212,6 +212,8 @@ func GetMedia(tbaKey, team string, year int) ([]Media, error) {
 
 	if resp.StatusCode == http.StatusNotModified {
 		return []Media{}, ErrNotModified
+	} else if resp.StatusCode == http.StatusNotFound {
+		return []Media{}, nil
 	} else if resp.StatusCode != http.StatusOK {
 		return []Media{}, fmt.Errorf("tba: polling failed with status code: %d", resp.StatusCode)
 	}
