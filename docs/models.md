@@ -186,10 +186,10 @@ An Alliance is just an array of strings (team numbers) in js.
 
 ### PostgreSQL
 
-| Name           | Type          | Constraints | Example        | Constraints |
-| -------------- | ------------- | ----------- | -------------- | ----------- |
-| username       | TEXT NOT NULL |             | "JohnSmith23"  | UNIQUE      |
-| hashedPassword | TEXT NOT NULL |             | "notarealhash" |             |
+| Name           | Type          | Constraints | Example        |
+| -------------- | ------------- | ----------- | -------------- |
+| username       | TEXT NOT NULL | UNIQUE      | "JohnSmith23"  |
+| hashedPassword | TEXT NOT NULL |             | "notarealhash" |
 
 ### JSON
 
@@ -197,3 +197,15 @@ An Alliance is just an array of strings (team numbers) in js.
 | -------------- | ------ | -------- | -------------- |
 | username       | string |          | "JohnSmith23"  |
 | hashedPassword | string |          | "notarealhash" |
+
+--
+
+## Photo
+
+### PostgreSQL
+
+| Name | Type          | Constraints       | Example                           |
+| ---- | ------------- | ----------------- | --------------------------------- |
+| team | TEXT NOT NULL |                   | "frc1678"                         |
+| url  | TEXT NOT NULL |                   | "http://i.imgur.com/uN3ojZyl.jpg" |
+|      |               | UNIQUE(team, url) |                                   |

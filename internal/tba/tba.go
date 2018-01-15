@@ -180,3 +180,44 @@ func GetMatches(tbaKey, eventKey string) ([]match.Match, error) {
 
 	return bMatches, nil
 }
+
+// Media is an incomplete model of TheBlueAlliance media model. It
+// only holds information we care about.
+type Media struct {
+	Type       string `json:"type"`
+	ForeignKey string `json:"foreign_key"`
+	Details    struct {
+		ThumbnailURL string `json:"thumbnail_url"`
+	} `json:"details"`
+}
+
+// GetMedia gets all media content for a team in the current year.
+func GetMedia(tbaKey, team string, year int) ([]Media, error) {
+	path := fmt.Sprintf("%s/team/%s/media/%d", tbaURL, team, year)
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return []Media{}, err
+	}
+
+	if lastModified := lastModified.Get(path); lastModified != "" {
+		req.Header.Set("If-Modified-Since", lastModified)
+	}
+
+	req.Header.Set("X-TBA-Auth-Key", tbaKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return []Media{}, err
+	}
+
+	if resp.StatusCode == http.StatusNotModified {
+		return []Media{}, ErrNotModified
+	} else if resp.StatusCode != http.StatusOK {
+		return []Media{}, fmt.Errorf("tba: polling failed with status code: %d", resp.StatusCode)
+	}
+
+	var media []Media
+	err = json.NewDecoder(io.LimitReader(resp.Body, 1.049e+6)).Decode(&media)
+
+	return media, err
+}

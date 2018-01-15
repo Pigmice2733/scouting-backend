@@ -10,6 +10,7 @@ import (
 	"github.com/Pigmice2733/scouting-backend/internal/store/postgres/migrations"
 
 	alliancePostgres "github.com/Pigmice2733/scouting-backend/internal/store/alliance/postgres"
+	photoPostgres "github.com/Pigmice2733/scouting-backend/internal/store/photo/postgres"
 	reportPostgres "github.com/Pigmice2733/scouting-backend/internal/store/report/postgres"
 	userPostgres "github.com/Pigmice2733/scouting-backend/internal/store/user/postgres"
 	// for the postgres sql driver
@@ -76,5 +77,6 @@ func New(db *sql.DB) (*store.Service, error) {
 		Alliance: alliancePostgres.New(db),
 		Report:   reportPostgres.New(db),
 		User:     userPostgres.New(db),
+		Photo:    photoPostgres.New(db),
 	}, nil
 }

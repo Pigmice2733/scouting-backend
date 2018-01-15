@@ -4,17 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"hash"
-	"hash/crc32"
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
-	"github.com/fharding1/ezetag"
 
 	"github.com/Pigmice2733/scouting-backend/internal/analysis"
 	"github.com/Pigmice2733/scouting-backend/internal/logger"
@@ -140,6 +135,8 @@ func (s *Server) newRouter() *mux.Router {
 
 	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler)))
 
+	router.Handle("/photo/{team}", stdMiddleware(http.HandlerFunc(s.photoHandler)))
+
 	router.Handle("/analysis/{eventKey}", cors(http.HandlerFunc(s.eventAnalysisHandler), []string{"GET"}))
 	router.Handle("/analysis/{eventKey}/{team}", cors(http.HandlerFunc(s.teamAnalysisHandler), []string{"GET"}))
 	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", cors(http.HandlerFunc(s.allianceAnalysisHandler), []string{"GET"}))
@@ -147,49 +144,70 @@ func (s *Server) newRouter() *mux.Router {
 	return router
 }
 
-func cors(next http.Handler, allowedMethods []string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(append(allowedMethods, "OPTIONS"), ","))
+const imgurFormat = "http://i.imgur.com/%sl.jpg"
 
-		if r.Method != "GET" {
-			w.Header().Set("Access-Control-Allow-Headers", "Authentication")
+func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
+	team := mux.Vars(r)["team"]
+	exists, err := s.store.Photo.Exists(team)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		s.logger.LogRequestError(r, fmt.Errorf("checking if team exists: %v", err))
+		return
+	}
+
+	var url string
+
+	if exists {
+		url, err = s.store.Photo.Get(team)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			s.logger.LogRequestError(r, fmt.Errorf("getting team photo: %v", err))
+			return
+		}
+	} else {
+		media, err := tba.GetMedia(s.tbaAPIKey, team, time.Now().Year())
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			s.logger.LogRequestError(r, fmt.Errorf("getting team media: %v", err))
+			return
 		}
 
-		if r.Method == "OPTIONS" {
-			return
-		} else if !existsIn(r.Method, allowedMethods) {
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-			return
+		for _, m := range media {
+			if m.Type == "imgur" {
+				url = fmt.Sprintf(imgurFormat, m.ForeignKey)
+				break
+			} else if m.Type == "instagram-image" {
+				url = m.Details.ThumbnailURL
+				break
+			}
 		}
 
-		next.ServeHTTP(w, r)
-	})
-}
-
-func existsIn(str string, strs []string) bool {
-	for _, s := range strs {
-		if s == str {
-			return true
+		if url != "" {
+			go func() {
+				if err := s.store.Photo.Create(team, url); err != nil {
+					s.logger.LogJSON(map[string]interface{}{"error": fmt.Errorf("upserting team photo: %v", err).Error()})
+				}
+			}()
 		}
 	}
-	return false
-}
 
-var castagoliTable = crc32.MakeTable(crc32.Castagnoli)
+	if url == "" {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
 
-func cache(next http.Handler) http.Handler {
-	return gziphandler.GzipHandler(ezetag.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overriden by /events
+	resp, err := http.Get(url)
+	if err != nil || (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		s.logger.LogRequestError(r, fmt.Errorf("getting team media: %v", err))
+		return
+	}
 
-		next.ServeHTTP(w, r)
-	}), func() hash.Hash {
-		return crc32.New(castagoliTable)
-	}))
-}
-
-func stdMiddleware(next http.Handler) http.Handler {
-	return cors(cache(next), []string{"GET"})
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		s.logger.LogRequestError(r, fmt.Errorf("copying team media to client: %v", err))
+		return
+	}
 }
 
 func (s *Server) pollEvents() {

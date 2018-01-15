@@ -255,3 +255,13 @@ Sends the report schema.
   "movedBuckets": "number"
 }
 ```
+
+---
+
+## /photo/{team}
+
+Responds with the (binary) photo for given team.
+
+### Response Body
+
+`binary photo`

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store/alliance"
+	"github.com/Pigmice2733/scouting-backend/internal/store/photo"
 	"github.com/Pigmice2733/scouting-backend/internal/store/report"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store/match"
@@ -22,4 +23,5 @@ type Service struct {
 	Alliance alliance.Service
 	Report   report.Service
 	User     user.Service
+	Photo    photo.Service
 }
