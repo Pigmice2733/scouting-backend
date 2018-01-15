@@ -3,6 +3,8 @@ package postgres
 import (
 	"database/sql"
 
+	"github.com/Pigmice2733/scouting-backend/internal/store"
+
 	"github.com/Pigmice2733/scouting-backend/internal/store/photo"
 )
 
@@ -16,15 +18,12 @@ func New(db *sql.DB) photo.Service {
 	return &Service{db: db}
 }
 
-// Exists checks whether a team has a photo in the database.
-func (s *Service) Exists(team string) (exists bool, err error) {
-	err = s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM photos WHERE team = $1)", team).Scan(&exists)
-	return
-}
-
 // Get gets the URL for a team photo from the database.
 func (s *Service) Get(team string) (url string, err error) {
 	err = s.db.QueryRow("SELECT url FROM photos WHERE team = $1", team).Scan(&url)
+	if err == sql.ErrNoRows {
+		err = store.ErrNoResults
+	}
 	return
 }
 

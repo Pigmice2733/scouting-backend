@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Pigmice2733/scouting-backend/internal/server/logic"
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
 
 	"github.com/Pigmice2733/scouting-backend/internal/analysis"
@@ -144,51 +145,14 @@ func (s *Server) newRouter() *mux.Router {
 	return router
 }
 
-const imgurFormat = "http://i.imgur.com/%sl.jpg"
-
 func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 	team := mux.Vars(r)["team"]
-	exists, err := s.store.Photo.Exists(team)
+
+	url, err := logic.GetPhoto(s.tbaAPIKey, team, time.Now().Year(), s.store.Photo)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		s.logger.LogRequestError(r, fmt.Errorf("checking if team exists: %v", err))
+		s.logger.LogRequestError(r, fmt.Errorf("getting team photo: %v", err))
 		return
-	}
-
-	var url string
-
-	if exists {
-		url, err = s.store.Photo.Get(team)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			s.logger.LogRequestError(r, fmt.Errorf("getting team photo: %v", err))
-			return
-		}
-	} else {
-		media, err := tba.GetMedia(s.tbaAPIKey, team, time.Now().Year())
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			s.logger.LogRequestError(r, fmt.Errorf("getting team media: %v", err))
-			return
-		}
-
-		for _, m := range media {
-			if m.Type == "imgur" {
-				url = fmt.Sprintf(imgurFormat, m.ForeignKey)
-				break
-			} else if m.Type == "instagram-image" {
-				url = m.Details.ThumbnailURL
-				break
-			}
-		}
-
-		if url != "" {
-			go func() {
-				if err := s.store.Photo.Create(team, url); err != nil {
-					s.logger.LogJSON(map[string]interface{}{"error": fmt.Errorf("upserting team photo: %v", err).Error()})
-				}
-			}()
-		}
 	}
 
 	if url == "" {

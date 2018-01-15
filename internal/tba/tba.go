@@ -223,3 +223,26 @@ func GetMedia(tbaKey, team string, year int) ([]Media, error) {
 
 	return media, err
 }
+
+const imgurFormat = "http://i.imgur.com/%sl.jpg"
+
+// GetPhotoURL returns the optimal photo url for a team in a certain year from
+// TBA api.
+func GetPhotoURL(tbaKey, team string, year int) (url string, err error) {
+	media, err := GetMedia(tbaKey, team, year)
+	if err != nil {
+		return "", err
+	}
+
+	for _, m := range media {
+		if m.Type == "imgur" {
+			url = fmt.Sprintf(imgurFormat, m.ForeignKey)
+			break
+		} else if m.Type == "instagram-image" {
+			url = m.Details.ThumbnailURL
+			break
+		}
+	}
+
+	return
+}
