@@ -22,22 +22,22 @@ import (
 type Server struct {
 	handler   http.Handler
 	store     *store.Service
+	consumer  tba.Consumer
 	logger    logger.Service
 	schema    analysis.Schema
-	tbaAPIKey string
 	jwtSecret []byte
 	certFile  string
 	keyFile   string
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(store *store.Service, logWriter io.Writer, tbaAPIKey, schemaPath string, certFile, keyFile string) (*Server, error) {
+func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, schemaPath string, certFile, keyFile string) (*Server, error) {
 	s := &Server{
-		logger:    logger.New(logWriter),
-		store:     store,
-		tbaAPIKey: tbaAPIKey,
-		certFile:  certFile,
-		keyFile:   keyFile,
+		logger:   logger.New(logWriter),
+		store:    store,
+		consumer: consumer,
+		certFile: certFile,
+		keyFile:  keyFile,
 	}
 
 	// setup report schema
@@ -148,7 +148,7 @@ func (s *Server) newRouter() *mux.Router {
 func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 	team := mux.Vars(r)["team"]
 
-	url, err := logic.GetPhoto(s.tbaAPIKey, team, time.Now().Year(), s.store.Photo)
+	url, err := logic.GetPhoto(team, time.Now().Year(), s.store.Photo, s.consumer)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		s.logger.LogRequestError(r, fmt.Errorf("getting team photo: %v", err))
@@ -176,7 +176,7 @@ func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) pollEvents() {
-	bEvents, err := tba.GetEvents(s.tbaAPIKey, time.Now().Year())
+	bEvents, err := s.consumer.GetEvents(time.Now().Year())
 	if err == tba.ErrNotModified {
 		return
 	} else if err != nil {
@@ -190,7 +190,7 @@ func (s *Server) pollEvents() {
 }
 
 func (s *Server) pollMatches(eventKey string) {
-	matches, err := tba.GetMatches(s.tbaAPIKey, eventKey)
+	matches, err := s.consumer.GetMatches(eventKey)
 	if err == tba.ErrNotModified {
 		return
 	} else if err != nil {

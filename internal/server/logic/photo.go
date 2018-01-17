@@ -9,14 +9,14 @@ import (
 // GetPhoto gets a photo from either the photo store if it exists there, or,
 // fetches it from the TBA API and attempts to store the photo in the photo
 // store.
-func GetPhoto(tbaKey, team string, year int, ps photo.Service) (string, error) {
+func GetPhoto(team string, year int, ps photo.Service, consumer tba.Consumer) (string, error) {
 	url, err := ps.Get(team)
 	if err != nil && err != store.ErrNoResults {
 		return "", err
 	}
 
 	if err == store.ErrNoResults || url == "" {
-		url, err = tba.GetPhotoURL(tbaKey, team, year)
+		url, err = consumer.GetPhotoURL(team, year)
 		if err != nil {
 			return "", err
 		}
