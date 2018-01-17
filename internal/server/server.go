@@ -166,6 +166,7 @@ func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 		s.logger.LogRequestError(r, fmt.Errorf("getting team media: %v", err))
 		return
 	}
+	defer resp.Body.Close()
 
 	if _, err := io.Copy(w, resp.Body); err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
