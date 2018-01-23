@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Pigmice2733/scouting-backend/internal/store/event"
+
 	"github.com/Pigmice2733/scouting-backend/internal/respond"
 	"github.com/Pigmice2733/scouting-backend/internal/store"
 	"github.com/gorilla/mux"
@@ -13,7 +15,9 @@ func (s *Server) eventsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "max-age=86400") // 24 hour max age
 
 	bEvents, err := s.store.Event.GetBasicEvents()
-	if err != nil {
+	if err == store.ErrNoResults {
+		bEvents = []event.BasicEvent{}
+	} else if err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("getting basic events: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
