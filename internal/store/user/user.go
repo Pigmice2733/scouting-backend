@@ -4,6 +4,7 @@ package user
 type User struct {
 	Username       string `json:"username"`
 	HashedPassword string `json:"hashedPassowrd"`
+	IsAdmin        bool   `json:"isAdmin"`
 }
 
 // Service is a store for users.

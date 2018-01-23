@@ -183,6 +183,7 @@ An Alliance is just an array of strings (team numbers) in js.
 | -------------- | ------ | ---- | -------------- |
 | Username       | string |      | "JohnSmith23"  |
 | HashedPassword | string |      | "notarealhash" |
+| IsAdmin        | bool   |      | true           |
 
 ### PostgreSQL
 
@@ -190,6 +191,7 @@ An Alliance is just an array of strings (team numbers) in js.
 | -------------- | ------------- | ----------- | -------------- |
 | username       | TEXT NOT NULL | UNIQUE      | "JohnSmith23"  |
 | hashedPassword | TEXT NOT NULL |             | "notarealhash" |
+| isAdmin        | TEXT NOT NULL |             | true           |
 
 ### JSON
 
@@ -197,6 +199,7 @@ An Alliance is just an array of strings (team numbers) in js.
 | -------------- | ------ | -------- | -------------- |
 | username       | string |          | "JohnSmith23"  |
 | hashedPassword | string |          | "notarealhash" |
+| isAdmin        | bool   |          | true           |
 
 --
 
@@ -209,3 +212,15 @@ An Alliance is just an array of strings (team numbers) in js.
 | team | TEXT NOT NULL |                   | "frc1678"                         |
 | url  | TEXT NOT NULL |                   | "http://i.imgur.com/uN3ojZyl.jpg" |
 |      |               | UNIQUE(team, url) |                                   |
+
+--
+
+## JWT Body
+
+### JSON
+
+| Name               | Type   | Example    |
+| ------------------ | ------ | ---------- |
+| sub                | string | "test"     |
+| exp                | int    | 1516739340 |
+| pigmice\_is\_admin | bool   | true       |

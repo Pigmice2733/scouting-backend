@@ -125,8 +125,8 @@ func (s *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 
 	router.Handle("/authenticate", cors(http.HandlerFunc(s.authenticateHandler), []string{"POST"}))
-	router.Handle("/users", cors(s.authHandler(http.HandlerFunc(s.createUserHandler)), []string{"POST"}))
-	router.Handle("/users/{username}", cors(s.authHandler(http.HandlerFunc(s.deleteUserHandler)), []string{"DELETE"}))
+	router.Handle("/users", cors(s.authHandler(adminHandler(http.HandlerFunc(s.createUserHandler))), []string{"POST"}))
+	router.Handle("/users/{username}", cors(s.authHandler(adminHandler(http.HandlerFunc(s.deleteUserHandler))), []string{"DELETE"}))
 
 	router.Handle("/events", stdMiddleware(http.HandlerFunc(s.eventsHandler)))
 	router.Handle("/events/{eventKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler))))

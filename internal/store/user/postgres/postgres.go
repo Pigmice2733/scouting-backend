@@ -16,7 +16,7 @@ func New(db *sql.DB) user.Service {
 
 // Get gets a user with a given username from the postgresql database.
 func (s *Service) Get(username string) (u user.User, err error) {
-	err = s.db.QueryRow("SELECT username, hashedPassword FROM users WHERE username = $1", username).Scan(&u.Username, &u.HashedPassword)
+	err = s.db.QueryRow("SELECT username, hashedPassword, isAdmin FROM users WHERE username = $1", username).Scan(&u.Username, &u.HashedPassword, &u.IsAdmin)
 	if err == sql.ErrNoRows {
 		err = store.ErrNoResults
 	}
@@ -25,7 +25,7 @@ func (s *Service) Get(username string) (u user.User, err error) {
 
 // Create creates a new user in the postgresql database.
 func (s *Service) Create(u user.User) error {
-	_, err := s.db.Exec("INSERT INTO users VALUES ($1, $2)", u.Username, u.HashedPassword)
+	_, err := s.db.Exec("INSERT INTO users VALUES ($1, $2, $3)", u.Username, u.HashedPassword, u.IsAdmin)
 	return err
 }
 

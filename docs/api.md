@@ -32,7 +32,7 @@ For retrieving a JWT token for authenticated requests.
 
 ---
 
-## /users - POST - Authenticated
+## /users - POST - Authenticated (Admin Users Only)
 
 Creates a new user.
 
@@ -47,7 +47,7 @@ Creates a new user.
 
 ---
 
-## /users/{username} - DELETE - Authenticated
+## /users/{username} - DELETE - Authenticated (Admin Users Only)
 
 Deletes a user.
 

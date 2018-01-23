@@ -10,6 +10,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	// SubjectClaim specifies the subject (user) of the jwt
+	SubjectClaim = "sub"
+	// ExpiresAtClaim specifies the time at which the jwt will expire
+	ExpiresAtClaim = "exp"
+	// IsAdminClaim specifies if the user is an admin user, and is prefixed with
+	// the pigmice prefix for collision resistance
+	IsAdminClaim = "pigmice_is_admin"
+)
+
 // ErrUnauthorized is returned when the user being attempted to be authorized has either the wrong username or password.
 var ErrUnauthorized = fmt.Errorf("unauthorized user")
 
@@ -30,8 +40,9 @@ func Authenticate(username, password string, jwtSecret []byte, us user.Service) 
 		return "", err
 	}
 
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
-		Subject:   username,
-		ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		SubjectClaim:   username,
+		ExpiresAtClaim: time.Now().Add(time.Hour * 24).Unix(),
+		IsAdminClaim:   user.IsAdmin,
 	}).SignedString(jwtSecret)
 }

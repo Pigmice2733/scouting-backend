@@ -20,6 +20,7 @@ type key int
 
 const (
 	keyUsernameCtx key = iota
+	keyIsAdminCtx
 )
 
 func (s *Server) authHandler(next http.Handler) http.Handler {
@@ -39,8 +40,14 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 		}
 
 		var username string
+		var isAdmin bool
+
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			if username, ok = claims["sub"].(string); !ok {
+			var uOk, aOk bool
+			username, uOk = claims[logic.SubjectClaim].(string)
+			isAdmin, aOk = claims[logic.IsAdminClaim].(bool)
+
+			if !uOk || !aOk {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
@@ -50,19 +57,25 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), keyUsernameCtx, username)
+		ctx = context.WithValue(ctx, keyIsAdminCtx, isAdmin)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
-	authBody := make(map[string]string)
+type requestUser struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
 
-	if err := json.NewDecoder(r.Body).Decode(&authBody); err != nil {
+func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
+	var reqUser requestUser
+
+	if err := json.NewDecoder(r.Body).Decode(&reqUser); err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	ss, err := logic.Authenticate(authBody["username"], authBody["password"], s.jwtSecret, s.store.User)
+	ss, err := logic.Authenticate(reqUser.Username, reqUser.Password, s.jwtSecret, s.store.User)
 	if err != nil {
 		if err == logic.ErrUnauthorized {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -77,21 +90,21 @@ func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
-	authBody := make(map[string]string)
+	var reqUser requestUser
 
-	if err := json.NewDecoder(r.Body).Decode(&authBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&reqUser); err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(authBody["password"]), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reqUser.Password), bcrypt.DefaultCost)
 	if err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("generating bcrypt hash from password: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	user := user.User{Username: authBody["username"], HashedPassword: string(hashedPassword)}
+	user := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword)}
 	if err := s.store.User.Create(user); err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("creating user: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
