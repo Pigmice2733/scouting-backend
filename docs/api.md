@@ -32,6 +32,21 @@ For retrieving a JWT token for authenticated requests.
 
 ---
 
+## /users - GET - Authenticated (Admin Users Only)
+
+Gets all users.
+
+### Response Body
+
+```json
+[
+  { "isAdmin": false, "username": "test2" },
+  { "isAdmin": true, "username": "test" }
+]
+```
+
+---
+
 ## /users - POST - Authenticated (Admin Users Only)
 
 Creates a new user.
@@ -41,7 +56,8 @@ Creates a new user.
 ```json
 {
   "username": "frank2",
-  "password": "asdf"
+  "password": "asdf",
+  "isAdmin": false
 }
 ```
 
@@ -50,6 +66,22 @@ Creates a new user.
 ## /users/{username} - DELETE - Authenticated (Admin Users Only)
 
 Deletes a user.
+
+---
+
+## /users/{username} - POST - Authenticated
+
+Updates a user.
+
+### Request Body
+
+```
+{
+  "username": "asdf",
+  "password": "test",
+  "isAdmin": false
+}
+```
 
 ---
 

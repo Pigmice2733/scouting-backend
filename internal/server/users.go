@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Pigmice2733/scouting-backend/internal/store"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Pigmice2733/scouting-backend/internal/respond"
@@ -65,6 +67,7 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 type requestUser struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	IsAdmin  bool   `json:"isAdmin"`
 }
 
 func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +92,24 @@ func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
 	respond.JSON(w, map[string]string{"jwt": ss})
 }
 
+func (s *Server) getUsersHandler(w http.ResponseWriter, r *http.Request) {
+	users, err := s.store.User.GetUsers()
+	if err == store.ErrNoResults {
+		users = []user.User{}
+	} else if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		s.logger.LogRequestError(r, fmt.Errorf("getting all users: %v", err))
+		return
+	}
+
+	var resp []map[string]interface{}
+	for _, u := range users {
+		resp = append(resp, map[string]interface{}{"username": u.Username, "isAdmin": u.IsAdmin})
+	}
+
+	respond.JSON(w, resp)
+}
+
 func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var reqUser requestUser
 
@@ -104,9 +125,46 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword)}
+	user := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword), IsAdmin: reqUser.IsAdmin}
 	if err := s.store.User.Create(user); err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("creating user: %v", err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	usernameToUpdate := mux.Vars(r)["username"]
+
+	authenticatedUser, uOk := r.Context().Value(keyUsernameCtx).(string)
+	authenticatedIsAdmin, aOk := r.Context().Value(keyIsAdminCtx).(bool)
+
+	if !uOk || !aOk {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	var reqUser requestUser
+	if err := json.NewDecoder(r.Body).Decode(&reqUser); err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if !authenticatedIsAdmin && (usernameToUpdate != authenticatedUser || reqUser.IsAdmin) {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reqUser.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	updateUser := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword), IsAdmin: reqUser.IsAdmin}
+
+	if err := s.store.User.Update(usernameToUpdate, updateUser); err != nil {
+		s.logger.LogRequestError(r, fmt.Errorf("updating user: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

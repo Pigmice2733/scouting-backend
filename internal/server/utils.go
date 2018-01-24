@@ -47,6 +47,14 @@ func cors(next http.Handler, allowedMethods []string) http.Handler {
 	})
 }
 
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1000000) // 1 MB
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func existsIn(str string, strs []string) bool {
 	for _, s := range strs {
 		if s == str {

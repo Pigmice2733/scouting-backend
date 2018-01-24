@@ -55,7 +55,7 @@ func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, schem
 
 	// setup routes
 
-	s.handler = s.newRouter()
+	s.handler = limitBody(s.newRouter())
 
 	// setup jwt secret
 
@@ -124,23 +124,25 @@ func (s *Server) Run(httpAddr, httpsAddr string) error {
 func (s *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 
-	router.Handle("/authenticate", cors(http.HandlerFunc(s.authenticateHandler), []string{"POST"}))
-	router.Handle("/users", cors(s.authHandler(adminHandler(http.HandlerFunc(s.createUserHandler))), []string{"POST"}))
-	router.Handle("/users/{username}", cors(s.authHandler(adminHandler(http.HandlerFunc(s.deleteUserHandler))), []string{"DELETE"}))
+	router.Handle("/authenticate", cors(http.HandlerFunc(s.authenticateHandler), []string{"POST"})).Methods("POST")
+	router.Handle("/users", cors(s.authHandler(adminHandler(http.HandlerFunc(s.getUsersHandler))), []string{"GET"})).Methods("GET")
+	router.Handle("/users", cors(s.authHandler(adminHandler(http.HandlerFunc(s.createUserHandler))), []string{"POST"})).Methods("POST")
+	router.Handle("/users/{username}", cors(s.authHandler(http.HandlerFunc(s.updateUserHandler)), []string{"POST"})).Methods("POST")
+	router.Handle("/users/{username}", cors(s.authHandler(adminHandler(http.HandlerFunc(s.deleteUserHandler))), []string{"DELETE"})).Methods("DELETE")
 
-	router.Handle("/events", stdMiddleware(http.HandlerFunc(s.eventsHandler)))
-	router.Handle("/events/{eventKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler))))
-	router.Handle("/events/{eventKey}/{matchKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.matchHandler))))
+	router.Handle("/events", stdMiddleware(http.HandlerFunc(s.eventsHandler))).Methods("GET")
+	router.Handle("/events/{eventKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler)))).Methods("GET")
+	router.Handle("/events/{eventKey}/{matchKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.matchHandler)))).Methods("GET")
 
-	router.Handle("/reports/{eventKey}/{matchKey}", cors(s.authHandler(http.HandlerFunc(s.reportHandler)), []string{"PUT"}))
+	router.Handle("/reports/{eventKey}/{matchKey}", cors(s.authHandler(http.HandlerFunc(s.reportHandler)), []string{"PUT"})).Methods("PUT")
 
-	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler)))
+	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler))).Methods("GET")
 
-	router.Handle("/photo/{team}", stdMiddleware(http.HandlerFunc(s.photoHandler)))
+	router.Handle("/photo/{team}", stdMiddleware(http.HandlerFunc(s.photoHandler))).Methods("GET")
 
-	router.Handle("/analysis/{eventKey}", cors(http.HandlerFunc(s.eventAnalysisHandler), []string{"GET"}))
-	router.Handle("/analysis/{eventKey}/{team}", cors(http.HandlerFunc(s.teamAnalysisHandler), []string{"GET"}))
-	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", cors(http.HandlerFunc(s.allianceAnalysisHandler), []string{"GET"}))
+	router.Handle("/analysis/{eventKey}", cors(http.HandlerFunc(s.eventAnalysisHandler), []string{"GET"})).Methods("GET")
+	router.Handle("/analysis/{eventKey}/{team}", cors(http.HandlerFunc(s.teamAnalysisHandler), []string{"GET"})).Methods("GET")
+	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", cors(http.HandlerFunc(s.allianceAnalysisHandler), []string{"GET"})).Methods("GET")
 
 	return router
 }
