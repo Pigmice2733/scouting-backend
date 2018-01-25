@@ -56,7 +56,7 @@ func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, schem
 
 	// setup routes
 
-	s.handler = cors(limitBody(s.newRouter()))
+	s.handler = s.newHandler()
 
 	// setup jwt secret
 
@@ -122,7 +122,7 @@ func (s *Server) Run(httpAddr, httpsAddr string) error {
 	return err
 }
 
-func (s *Server) newRouter() *mux.Router {
+func (s *Server) newHandler() http.Handler {
 	router := mux.NewRouter()
 
 	mroute.HandleRoutes(router, map[string]mroute.Route{
@@ -161,7 +161,7 @@ func (s *Server) newRouter() *mux.Router {
 		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET"),
 	})
 
-	return router
+	return cors(limitBody(router))
 }
 
 func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {

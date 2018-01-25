@@ -82,10 +82,6 @@ func cors(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Authentication")
 
-		if r.Method == "OPTIONS" {
-			return
-		}
-
 		next.ServeHTTP(w, r)
 	})
 }
