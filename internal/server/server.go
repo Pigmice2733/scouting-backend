@@ -56,7 +56,7 @@ func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, schem
 
 	// setup routes
 
-	s.handler = limitBody(s.newRouter())
+	s.handler = cors(limitBody(s.newRouter()))
 
 	// setup jwt secret
 
@@ -126,7 +126,7 @@ func (s *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 
 	mroute.HandleRoutes(router, map[string]mroute.Route{
-		"/authenticate": mroute.Simple(http.HandlerFunc(s.authenticateHandler), "POST", cors),
+		"/authenticate": mroute.Simple(http.HandlerFunc(s.authenticateHandler), "POST"),
 
 		"/users": {
 			Handler: mroute.Multi(map[string]http.Handler{
@@ -134,7 +134,7 @@ func (s *Server) newRouter() *mux.Router {
 				"POST": http.HandlerFunc(s.createUserHandler),
 			}),
 			Methods:     []string{"GET", "POST"},
-			Middlewares: []mroute.Middleware{cors, s.authHandler, adminHandler},
+			Middlewares: []mroute.Middleware{s.authHandler, adminHandler},
 		},
 
 		"/users/{username}": {
@@ -143,22 +143,22 @@ func (s *Server) newRouter() *mux.Router {
 				"DELETE": http.HandlerFunc(s.deleteUserHandler),
 			}),
 			Methods:     []string{"POST", "DELETE"},
-			Middlewares: []mroute.Middleware{cors, s.authHandler},
+			Middlewares: []mroute.Middleware{s.authHandler},
 		},
 
-		"/events":                       mroute.Simple(http.HandlerFunc(s.eventsHandler), "GET", cors, cache),
-		"/events/{eventKey}":            mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cors, cache, s.pollMatchMiddleware),
-		"/events/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cors, cache, s.pollMatchMiddleware),
+		"/events":                       mroute.Simple(http.HandlerFunc(s.eventsHandler), "GET", cache),
+		"/events/{eventKey}":            mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cache, s.pollMatchMiddleware),
+		"/events/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cache, s.pollMatchMiddleware),
 
-		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", cors, cache, s.authHandler),
+		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", cache, s.authHandler),
 
-		"/schema": mroute.Simple(http.HandlerFunc(s.schemaHandler), "GET", cors, cache),
+		"/schema": mroute.Simple(http.HandlerFunc(s.schemaHandler), "GET", cache),
 
-		"/photo/{team}": mroute.Simple(http.HandlerFunc(s.photoHandler), "GET", cors, cache),
+		"/photo/{team}": mroute.Simple(http.HandlerFunc(s.photoHandler), "GET", cache),
 
-		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET", cors),
-		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET", cors),
-		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET", cors),
+		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET"),
+		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET"),
+		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET"),
 	})
 
 	return router
