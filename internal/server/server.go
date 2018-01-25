@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Pigmice2733/scouting-backend/internal/mroute"
 	"github.com/Pigmice2733/scouting-backend/internal/server/logic"
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
 
@@ -124,25 +125,41 @@ func (s *Server) Run(httpAddr, httpsAddr string) error {
 func (s *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 
-	router.Handle("/authenticate", cors(http.HandlerFunc(s.authenticateHandler), []string{"POST"}))
-	router.Handle("/users", cors(s.authHandler(adminHandler(http.HandlerFunc(s.getUsersHandler))), []string{"GET"})).Methods("GET", "OPTIONS")
-	router.Handle("/users", cors(s.authHandler(adminHandler(http.HandlerFunc(s.createUserHandler))), []string{"POST"})).Methods("POST", "OPTIONS")
-	router.Handle("/users/{username}", cors(s.authHandler(http.HandlerFunc(s.updateUserHandler)), []string{"POST"})).Methods("POST", "OPTIONS")
-	router.Handle("/users/{username}", cors(s.authHandler(adminHandler(http.HandlerFunc(s.deleteUserHandler))), []string{"DELETE"})).Methods("DELETE", "OPTIONS")
+	mroute.HandleRoutes(router, map[string]mroute.Route{
+		"/authenticate": mroute.Simple(http.HandlerFunc(s.authenticateHandler), "POST", cors),
 
-	router.Handle("/events", stdMiddleware(http.HandlerFunc(s.eventsHandler)))
-	router.Handle("/events/{eventKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.eventHandler))))
-	router.Handle("/events/{eventKey}/{matchKey}", stdMiddleware(s.pollMatchMiddleware(http.HandlerFunc(s.matchHandler))))
+		"/users": {
+			Handler: mroute.Multi(map[string]http.Handler{
+				"GET":  http.HandlerFunc(s.getUsersHandler),
+				"POST": http.HandlerFunc(s.createUserHandler),
+			}),
+			Methods:     []string{"GET", "POST"},
+			Middlewares: []mroute.Middleware{cors, s.authHandler, adminHandler},
+		},
 
-	router.Handle("/reports/{eventKey}/{matchKey}", cors(s.authHandler(http.HandlerFunc(s.reportHandler)), []string{"PUT"}))
+		"/users/{username}": {
+			Handler: mroute.Multi(map[string]http.Handler{
+				"POST":   http.HandlerFunc(s.updateUserHandler),
+				"DELETE": http.HandlerFunc(s.deleteUserHandler),
+			}),
+			Methods:     []string{"POST", "DELETE"},
+			Middlewares: []mroute.Middleware{cors, s.authHandler},
+		},
 
-	router.Handle("/schema", stdMiddleware(http.HandlerFunc(s.schemaHandler)))
+		"/events":                       mroute.Simple(http.HandlerFunc(s.eventsHandler), "GET", cors, cache),
+		"/events/{eventKey}":            mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cors, cache, s.pollMatchMiddleware),
+		"/events/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cors, cache, s.pollMatchMiddleware),
 
-	router.Handle("/photo/{team}", stdMiddleware(http.HandlerFunc(s.photoHandler)))
+		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", cors, cache, s.authHandler),
 
-	router.Handle("/analysis/{eventKey}", cors(http.HandlerFunc(s.eventAnalysisHandler), []string{"GET"}))
-	router.Handle("/analysis/{eventKey}/{team}", cors(http.HandlerFunc(s.teamAnalysisHandler), []string{"GET"}))
-	router.Handle("/analysis/{eventKey}/{matchKey}/{color}", cors(http.HandlerFunc(s.allianceAnalysisHandler), []string{"GET"}))
+		"/schema": mroute.Simple(http.HandlerFunc(s.schemaHandler), "GET", cors, cache),
+
+		"/photo/{team}": mroute.Simple(http.HandlerFunc(s.photoHandler), "GET", cors, cache),
+
+		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET", cors),
+		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET", cors),
+		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET", cors),
+	})
 
 	return router
 }

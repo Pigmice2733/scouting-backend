@@ -1,11 +1,9 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store"
 
@@ -14,55 +12,8 @@ import (
 	"github.com/Pigmice2733/scouting-backend/internal/respond"
 	"github.com/Pigmice2733/scouting-backend/internal/server/logic"
 	"github.com/Pigmice2733/scouting-backend/internal/store/user"
-	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 )
-
-type key int
-
-const (
-	keyUsernameCtx key = iota
-	keyIsAdminCtx
-)
-
-func (s *Server) authHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ss := strings.TrimPrefix(r.Header.Get("Authentication"), "Bearer ")
-		token, err := jwt.Parse(ss, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-
-			return s.jwtSecret, nil
-		})
-
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-
-		var username string
-		var isAdmin bool
-
-		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			var uOk, aOk bool
-			username, uOk = claims[logic.SubjectClaim].(string)
-			isAdmin, aOk = claims[logic.IsAdminClaim].(bool)
-
-			if !uOk || !aOk {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-				return
-			}
-		} else {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), keyUsernameCtx, username)
-		ctx = context.WithValue(ctx, keyIsAdminCtx, isAdmin)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
 
 type requestUser struct {
 	Username string `json:"username"`
@@ -171,9 +122,22 @@ func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
-	username := mux.Vars(r)["username"]
+	usernameToDelete := mux.Vars(r)["username"]
 
-	if err := s.store.User.Delete(username); err != nil {
+	authenticatedUser, uOk := r.Context().Value(keyUsernameCtx).(string)
+	authenticatedIsAdmin, aOk := r.Context().Value(keyIsAdminCtx).(bool)
+
+	if !uOk || !aOk {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if !authenticatedIsAdmin && usernameToDelete != authenticatedUser {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	if err := s.store.User.Delete(usernameToDelete); err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("deleting user: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
