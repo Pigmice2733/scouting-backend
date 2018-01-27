@@ -21,6 +21,12 @@ type requestUser struct {
 	IsAdmin  bool   `json:"isAdmin"`
 }
 
+type nullableRequestUser struct {
+	Username *string `json:"username"`
+	Password *string `json:"password"`
+	IsAdmin  *bool   `json:"isAdmin"`
+}
+
 func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
 	var reqUser requestUser
 
@@ -95,24 +101,28 @@ func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqUser requestUser
+	var reqUser nullableRequestUser
 	if err := json.NewDecoder(r.Body).Decode(&reqUser); err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	if !authenticatedIsAdmin && (usernameToUpdate != authenticatedUser || reqUser.IsAdmin) {
+	if !authenticatedIsAdmin && (usernameToUpdate != authenticatedUser || (reqUser.IsAdmin != nil && *reqUser.IsAdmin)) {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reqUser.Password), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
+	updateUser := user.NullableUser{Username: reqUser.Username, IsAdmin: reqUser.IsAdmin}
 
-	updateUser := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword), IsAdmin: reqUser.IsAdmin}
+	if reqUser.Password != nil {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*reqUser.Password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		hashededPasswordStr := string(hashedPassword)
+		updateUser.HashedPassword = &hashededPasswordStr
+	}
 
 	if err := s.store.User.Update(usernameToUpdate, updateUser); err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("updating user: %v", err))

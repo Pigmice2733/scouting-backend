@@ -139,10 +139,10 @@ func (s *Server) newHandler() http.Handler {
 
 		"/users/{username}": {
 			Handler: mroute.Multi(map[string]http.Handler{
-				"POST":   http.HandlerFunc(s.updateUserHandler),
+				"PUT":    http.HandlerFunc(s.updateUserHandler),
 				"DELETE": http.HandlerFunc(s.deleteUserHandler),
 			}),
-			Methods:     []string{"POST", "DELETE"},
+			Methods:     []string{"PUT", "DELETE"},
 			Middlewares: []mroute.Middleware{s.authHandler},
 		},
 

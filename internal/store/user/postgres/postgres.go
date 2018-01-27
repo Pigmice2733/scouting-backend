@@ -50,8 +50,16 @@ func (s *Service) GetUsers() ([]user.User, error) {
 }
 
 // Update updates a given user in the postgresql database.
-func (s *Service) Update(username string, u user.User) error {
-	_, err := s.db.Exec("UPDATE users SET username = $1, hashedPassword = $2, isAdmin = $3 WHERE username = $4", u.Username, u.HashedPassword, u.IsAdmin, username)
+func (s *Service) Update(username string, nu user.NullableUser) error {
+	_, err := s.db.Exec(`
+		UPDATE users
+			SET
+				username = COALESCE($1, username),
+				hashedPassword = COALESCE($2, hashedPassword),
+				isAdmin = COALESCE($3, isAdmin)
+			WHERE
+				username = $4
+		`, nu.Username, nu.HashedPassword, nu.IsAdmin, username)
 	return err
 }
 

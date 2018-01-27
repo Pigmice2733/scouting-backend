@@ -69,7 +69,7 @@ Deletes a user.
 
 ---
 
-## /users/{username} - POST - Authenticated
+## /users/{username} - PUT - Authenticated
 
 Updates a user.
 
