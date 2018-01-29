@@ -7,5 +7,7 @@
 	"cubesOnSwitch": "number",
 	"climbed": "bool",
 	"cubesIntoExchange": "number",
-	"crossedLineInAuto": "bool"
+	"crossedLineInAuto": "bool",
+	"hadConnectionProblems": "bool",
+	"hadPowerProblems": "bool"
 }
