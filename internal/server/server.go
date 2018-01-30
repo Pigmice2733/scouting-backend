@@ -198,6 +198,13 @@ func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) leaderboardHandler(w http.ResponseWriter, r *http.Request) {
+	type stat struct {
+		Reporter string `json:"reporter"`
+		Reports  int    `json:"reports"`
+	}
+
+	var resp []stat
+
 	stats, err := s.store.Report.GetReporterStats()
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -205,7 +212,11 @@ func (s *Server) leaderboardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respond.JSON(w, stats)
+	for reporter, reports := range stats {
+		resp = append(resp, stat{reporter, reports})
+	}
+
+	respond.JSON(w, resp)
 }
 
 func (s *Server) pollEvents() {

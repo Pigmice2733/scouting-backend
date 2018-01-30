@@ -297,3 +297,15 @@ Responds with the (binary) photo for given team.
 ### Response Body
 
 `binary photo`
+
+---
+
+## /leaderboard
+
+Responds with the leaderboard of top reporters.
+
+### Response Body
+
+```json
+[{ "reporter": "test", "reports": 2 }, { "reporter": "test2", "reports": 4 }]
+```
