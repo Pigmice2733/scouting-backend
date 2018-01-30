@@ -90,3 +90,27 @@ func (s *Service) GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data
 
 	return stats, rows.Err()
 }
+
+// GetReporterStats gets a map of all reporters to the amount of reports they have submitted.
+func (s *Service) GetReporterStats() (map[string]int, error) {
+	rows, err := s.db.Query("SELECT reporter, COUNT(reporter) FROM reports GROUP BY reporter")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make(map[string]int)
+
+	for rows.Next() {
+		var reporter string
+		var count int
+
+		if err := rows.Scan(&reporter, &count); err != nil {
+			return nil, err
+		}
+
+		stats[reporter] = count
+	}
+
+	return stats, rows.Err()
+}

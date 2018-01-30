@@ -19,4 +19,5 @@ type Service interface {
 	Upsert(rep Report, as alliance.Service) error
 	GetReportedOn(eventKey string) ([]string, error)
 	GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data, error)
+	GetReporterStats() (map[string]int, error)
 }

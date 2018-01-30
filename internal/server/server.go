@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Pigmice2733/scouting-backend/internal/mroute"
+	"github.com/Pigmice2733/scouting-backend/internal/respond"
 	"github.com/Pigmice2733/scouting-backend/internal/server/logic"
 	"github.com/Pigmice2733/scouting-backend/internal/tba"
 
@@ -159,6 +160,8 @@ func (s *Server) newHandler() http.Handler {
 		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET"),
 		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET"),
 		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET"),
+
+		"/leaderboard": mroute.Simple(http.HandlerFunc(s.leaderboardHandler), "GET"),
 	})
 
 	return cors(limitBody(router))
@@ -192,6 +195,17 @@ func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 		s.logger.LogRequestError(r, fmt.Errorf("copying team media to client: %v", err))
 		return
 	}
+}
+
+func (s *Server) leaderboardHandler(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.store.Report.GetReporterStats()
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		s.logger.LogRequestError(r, fmt.Errorf("getting reporter stats: %v", err))
+		return
+	}
+
+	respond.JSON(w, stats)
 }
 
 func (s *Server) pollEvents() {
