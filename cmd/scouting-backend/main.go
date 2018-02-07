@@ -40,8 +40,13 @@ func main() {
 		schemaPath = envSchemaPath
 	}
 
+	origin := "*"
+	if envOrigin, ok := os.LookupEnv("ORIGIN"); ok {
+		origin = envOrigin
+	}
+
 	server, err := server.New(
-		store, consumer, os.Stdout, schemaPath,
+		store, consumer, os.Stdout, origin, schemaPath,
 		os.Getenv("CERT_FILE"), os.Getenv("KEY_FILE"))
 	if err != nil {
 		fmt.Printf("unable to create server: %v\n", err)

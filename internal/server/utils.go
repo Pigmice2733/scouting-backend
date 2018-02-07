@@ -77,9 +77,9 @@ func adminHandler(next http.Handler) http.Handler {
 	})
 }
 
-func cors(next http.Handler) http.Handler {
+func cors(next http.Handler, origin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Headers", "Authentication")
 
 		next.ServeHTTP(w, r)

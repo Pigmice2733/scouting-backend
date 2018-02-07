@@ -42,6 +42,10 @@ func HandleRoutes(r *mux.Router, routes map[string]Route) {
 }
 
 func routeHandler(route Route) http.Handler {
+	for i := len(route.Middlewares) - 1; i >= 0; i-- {
+		route.Handler = route.Middlewares[i](route.Handler)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		methods := append(route.Methods, "OPTIONS")
 
@@ -54,10 +58,6 @@ func routeHandler(route Route) http.Handler {
 
 		if r.Method == "OPTIONS" {
 			return
-		}
-
-		for i := len(route.Middlewares) - 1; i >= 0; i-- {
-			route.Handler = route.Middlewares[i](route.Handler)
 		}
 
 		route.Handler.ServeHTTP(w, r)

@@ -33,7 +33,7 @@ type Server struct {
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, schemaPath string, certFile, keyFile string) (*Server, error) {
+func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, origin, schemaPath string, certFile, keyFile string) (*Server, error) {
 	s := &Server{
 		logger:   logger.New(logWriter),
 		store:    store,
@@ -57,7 +57,7 @@ func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, schem
 
 	// setup routes
 
-	s.handler = s.newHandler()
+	s.handler = s.newHandler(origin)
 
 	// setup jwt secret
 
@@ -123,7 +123,7 @@ func (s *Server) Run(httpAddr, httpsAddr string) error {
 	return err
 }
 
-func (s *Server) newHandler() http.Handler {
+func (s *Server) newHandler(origin string) http.Handler {
 	router := mux.NewRouter()
 
 	mroute.HandleRoutes(router, map[string]mroute.Route{
@@ -164,7 +164,7 @@ func (s *Server) newHandler() http.Handler {
 		"/leaderboard": mroute.Simple(http.HandlerFunc(s.leaderboardHandler), "GET"),
 	})
 
-	return cors(limitBody(router))
+	return cors(limitBody(router), origin)
 }
 
 func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
