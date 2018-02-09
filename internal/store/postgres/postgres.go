@@ -31,13 +31,13 @@ type Options struct {
 	StatementTimeout int
 }
 
-func (o Options) connectionInfo() string {
+func (o Options) ConnectionInfo() string {
 	return fmt.Sprintf("host='%s' port='%d' user='%s' password='%s' dbname='%s' sslmode='%s' statement_timeout=%d", o.Host, o.Port, o.User, o.Pass, o.DBName, o.SSLMode, o.StatementTimeout)
 }
 
 // NewFromOptions will connect to a postgresql server with given options
 func NewFromOptions(options Options) (*store.Service, error) {
-	db, err := sql.Open("postgres", options.connectionInfo())
+	db, err := sql.Open("postgres", options.ConnectionInfo())
 	if err != nil {
 		return nil, err
 	}

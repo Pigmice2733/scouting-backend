@@ -1,6 +1,8 @@
 # Binaries
 /cmd/scouting-backend/scouting-backend
 /cmd/scouting-backend/scouting-backend.exe
+/cmd/archive/archive
+/cmd/archive/archive.exe
 
-# Govendor
-/vendor/**/
+# Archive JSON
+/cmd/archive/*.json
