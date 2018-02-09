@@ -17,6 +17,7 @@ Some environment variables are needed to tell the app what to do.
 * CERT_FILE: path to ssl certificate file
 * KEY_FILE: path to ssl key file
 * ORIGIN: ACCESS-CONTROL-ALLOW-ORIGIN http header value (defaults to '\*')
+* YEAR: year to use when consuming data from tba api (defaults to current year)
 
 ## Running
 

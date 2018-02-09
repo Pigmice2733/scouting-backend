@@ -30,16 +30,18 @@ type Server struct {
 	jwtSecret []byte
 	certFile  string
 	keyFile   string
+	year      int
 }
 
 // New creates a new server given a db file and a io.Writer for logging
-func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, origin, schemaPath string, certFile, keyFile string) (*Server, error) {
+func New(store *store.Service, consumer tba.Consumer, logWriter io.Writer, year int, origin, schemaPath string, certFile, keyFile string) (*Server, error) {
 	s := &Server{
 		logger:   logger.New(logWriter),
 		store:    store,
 		consumer: consumer,
 		certFile: certFile,
 		keyFile:  keyFile,
+		year:     year,
 	}
 
 	// setup report schema
@@ -170,7 +172,7 @@ func (s *Server) newHandler(origin string) http.Handler {
 func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {
 	team := mux.Vars(r)["team"]
 
-	url, err := logic.GetPhoto(team, time.Now().Year(), s.store.Photo, s.consumer)
+	url, err := logic.GetPhoto(team, s.year, s.store.Photo, s.consumer)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		s.logger.LogRequestError(r, fmt.Errorf("getting team photo: %v", err))
@@ -220,7 +222,7 @@ func (s *Server) leaderboardHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) pollEvents() {
-	bEvents, err := s.consumer.GetEvents(time.Now().Year())
+	bEvents, err := s.consumer.GetEvents(s.year)
 	if err == tba.ErrNotModified {
 		return
 	} else if err != nil {
