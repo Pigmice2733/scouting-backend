@@ -219,8 +219,8 @@ An Alliance is just an array of strings (team numbers) in js.
 
 ### JSON
 
-| Name               | Type   | Example    |
-| ------------------ | ------ | ---------- |
-| sub                | string | "test"     |
-| exp                | int    | 1516739340 |
-| pigmice\_is\_admin | bool   | true       |
+| Name             | Type   | Example    |
+| ---------------- | ------ | ---------- |
+| sub              | string | "test"     |
+| exp              | int    | 1516739340 |
+| pigmice_is_admin | bool   | true       |
