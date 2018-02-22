@@ -8,6 +8,8 @@
 	"climbed": "bool",
 	"cubesIntoExchange": "number",
 	"crossedLineInAuto": "bool",
+	"cubesOnScaleInAuto": "number",
+	"cubesOnSwitchInAuto": "number",
 	"hadConnectionProblems": "bool",
 	"hadPowerProblems": "bool"
 }
