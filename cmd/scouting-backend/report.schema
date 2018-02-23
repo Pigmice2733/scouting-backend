@@ -1,13 +1,13 @@
 {
-	"cubesOnScale": "number",
-	"cubesOnSwitch": "number",
-	"climbed": "bool",
-	"endsOnPlatform": "bool",
-	"present": "bool",
-	"cubesIntoExchange": "number",
-	"crossedLineInAuto": "bool",
-	"cubesOnScaleInAuto": "number",
-	"cubesOnSwitchInAuto": "number",
+	"teleopCubesOnScale": "number",
+	"teleopCubesOnSwitch": "number",
+	"teleopClimbed": "bool",
+	"teleopEndsOnPlatform": "bool",
+	"teleopCubesIntoExchange": "number",
+	"autoCrossedLine": "bool",
+	"autoCubesOnScale": "number",
+	"autoCubesOnSwitch": "number",
 	"hadConnectionProblems": "bool",
-	"hadPowerProblems": "bool"
+	"hadPowerProblems": "bool",
+	"present": "bool"
 }
