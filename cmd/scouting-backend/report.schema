@@ -1,11 +1,9 @@
 {
-	"cubesInVault": "number",
-	"activatedLevitate": "bool",
-	"activatedForce": "bool",
-	"activatedBoost": "bool",
 	"cubesOnScale": "number",
 	"cubesOnSwitch": "number",
 	"climbed": "bool",
+	"endsOnPlatform": "bool",
+	"present": "bool",
 	"cubesIntoExchange": "number",
 	"crossedLineInAuto": "bool",
 	"cubesOnScaleInAuto": "number",
