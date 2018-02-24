@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/pigmice2733/scouting-backend)](https://goreportcard.com/report/github.com/pigmice2733/scouting-backend) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Pigmice (FRC 2733) Scouting Backend
 
 ## Environment Variables
