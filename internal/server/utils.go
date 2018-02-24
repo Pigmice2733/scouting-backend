@@ -98,7 +98,7 @@ var castagoliTable = crc32.MakeTable(crc32.Castagnoli)
 
 func cache(next http.Handler) http.Handler {
 	return gziphandler.GzipHandler(ezetag.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overriden by /events
+		w.Header().Set("Cache-Control", "max-age=180") // 3 minute max age, overridden by /events
 
 		next.ServeHTTP(w, r)
 	}), func() hash.Hash {

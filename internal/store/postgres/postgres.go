@@ -31,6 +31,7 @@ type Options struct {
 	StatementTimeout int
 }
 
+// ConnectionInfo returns the postgresql connection string from an options struct.
 func (o Options) ConnectionInfo() string {
 	return fmt.Sprintf("host='%s' port='%d' user='%s' password='%s' dbname='%s' sslmode='%s' statement_timeout=%d", o.Host, o.Port, o.User, o.Pass, o.DBName, o.SSLMode, o.StatementTimeout)
 }
