@@ -94,18 +94,22 @@ Gets all (basic) events.
 ```json
 [
   {
-    "key": "2017alhu",
-    "name": "Rocket City Regional",
-    "shortName": "Rocket City",
-    "date": "2017-03-21T17:00:00-07:00",
-    "eventType": 0,
+    "key": "2018week0",
+    "name": "Week 0",
+    "shortName": "Week 0",
+    "eventType": 100,
+    "lat": 42.937225341796875,
+    "long": -71.51953887939453,
+    "date": "2018-02-16T16:00:00-08:00"
   },
   {
-    "key": "2017code",
-    "name": "Colorado Regional",
-    "shortName": "Colorado",
-    "date": "2017-03-21T17:00:00-07:00",
+    "key": "2018wila",
+    "name": "Seven Rivers Regional",
+    "shortName": "Seven Rivers",
     "eventType": 0,
+    "lat": 43.812232971191406,
+    "long": -91.25572204589844,
+    "date": "2018-04-03T17:00:00-07:00"
   },
   ...
 ]
@@ -119,16 +123,23 @@ Gets a complete event including matches.
 
 ```json
 {
-  "key": "2017nhfoc",
-  "name": "FIRST Festival of Champions",
-  "shortName": "FIRST Festival of Champions",
-  "date": "2017-07-28T17:00:00-07:00",
-  "eventType": 0,
+  "key": "2018week0",
+  "name": "Week 0",
+  "shortName": "Week 0",
+  "eventType": 100,
+  "lat": 42.937225341796875,
+  "long": -71.51953887939453,
+  "date": "2018-02-16T16:00:00-08:00",
   "matches": [
     {
-      "key": "2017nhfoc_f1m1",
-      "predictedTime": "2017-07-29T15:20:00Z",
-      "actualTime": "2017-07-29T15:20:42Z",
+      "key": "2018week0_f1m1",
+      "predictedTime": "2018-02-17T12:57:09-08:00",
+      "actualTime": "2018-02-17T12:58:26-08:00"
+    },
+    {
+      "key": "2018week0_f1m2",
+      "predictedTime": "2018-02-17T13:11:01-08:00",
+      "actualTime": "2018-02-17T13:11:59-08:00"
     },
     ...
   ]

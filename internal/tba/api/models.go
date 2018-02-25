@@ -1,11 +1,13 @@
 package api
 
 type tbaEvent struct {
-	Key       string `json:"key"`
-	Name      string `json:"name"`
-	ShortName string `json:"short_name"`
-	EventType int    `json:"event_type"`
-	Date      string `json:"start_date"`
+	Key       string   `json:"key"`
+	Name      string   `json:"name"`
+	ShortName string   `json:"short_name"`
+	EventType int      `json:"event_type"`
+	Lat       *float64 `json:"lat"`
+	Lng       *float64 `json:"lng"`
+	Date      string   `json:"start_date"`
 }
 
 type tbaMatch struct {

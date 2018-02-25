@@ -75,6 +75,8 @@ func (c Consumer) GetEvents(year int) ([]event.BasicEvent, error) {
 			Name:      tbaEvent.Name,
 			ShortName: tbaEvent.ShortName,
 			EventType: tbaEvent.EventType,
+			Lat:       tbaEvent.Lat,
+			Long:      tbaEvent.Lng,
 			Date:      startDate,
 		})
 	}

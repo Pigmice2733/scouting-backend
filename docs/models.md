@@ -4,13 +4,15 @@
 
 ### Go
 
-| Name      | Type      | Tags | Example                    |
-| --------- | --------- | ---- | -------------------------- |
-| Key       | string    |      | "2017cmptx"                |
-| Name      | string    |      | "Einstein Field (Houston)" |
-| ShortName | string    |      | "Einstein (Houston)"       |
-| Date      | time.Time |      | 2017-07-29T15:20:00Z       |
-| EventType | int       |      | 99                         |
+| Name      | Type      | Tags      | Example                    |
+| --------- | --------- | --------- | -------------------------- |
+| Key       | string    |           | "2017cmptx"                |
+| Name      | string    |           | "Einstein Field (Houston)" |
+| ShortName | string    |           | "Einstein (Houston)"       |
+| Date      | time.Time |           | 2017-07-29T15:20:00Z       |
+| Lat       | \*float64 | omitempty | 42.937225341796875         |
+| Long      | \*float64 | omitempty | -71.51953887939453         |
+| EventType | int       |           | 99                         |
 
 ### PostgreSQL
 
@@ -18,13 +20,15 @@ See [Event](#event)
 
 ### JSON
 
-| Name      | Type    | Comments | Example                    |
-| --------- | ------- | -------- | -------------------------- |
-| key       | string  |          | "2017cmptx"                |
-| name      | string  |          | "Einstein Field (Houston)" |
-| shortName | string  |          | "Einstein (Houston)"       |
-| date      | string  |          | "2017-07-29T15:20:00Z"     |
-| eventType | integer |          | 99                         |
+| Name      | Type    | Comments  | Example                    |
+| --------- | ------- | --------- | -------------------------- |
+| key       | string  |           | "2017cmptx"                |
+| name      | string  |           | "Einstein Field (Houston)" |
+| shortName | string  |           | "Einstein (Houston)"       |
+| date      | string  |           | "2017-07-29T15:20:00Z"     |
+| lat       | number  | omitempty | 42.937225341796875         |
+| long      | number  | omitempty | -71.51953887939453         |
+| eventType | integer |           | 99                         |
 
 ---
 
@@ -45,18 +49,22 @@ See [Event](#event)
 | name      | TEXT             | NOT NULL    | "Einstein Field (Houston)" |
 | shortName | TEXT             |             | "Einstein (Houston)"       |
 | date      | TIMESTAMPTZ      | NOT NULL    | 2017-07-29T15:20:00Z       |
+| Lat       | REAL             |             | 42.937225341796875         |
+| Long      | REAL             |             | -71.51953887939453         |
 | eventType | INTEGER          | NOT NULL    | 99                         |
 
 ### JSON
 
-| Name      | Type                         | Comments | Example                    |
-| --------- | ---------------------------- | -------- | -------------------------- |
-| key       | string                       |          | "2017cmptx"                |
-| name      | string                       |          | "Einstein Field (Houston)" |
-| shortName | string                       |          | "Einstein (Houston)"       |
-| date      | int (UNIX TIME)              |          | 1512764281                 |
-| eventType | int                          |          | 99                         |
-| matches   | [][match.basic](#basicmatch) |          | See [Match](#basicmatch)   |
+| Name      | Type                         | Comments  | Example                    |
+| --------- | ---------------------------- | --------- | -------------------------- |
+| key       | string                       |           | "2017cmptx"                |
+| name      | string                       |           | "Einstein Field (Houston)" |
+| shortName | string                       |           | "Einstein (Houston)"       |
+| date      | int (UNIX TIME)              |           | 1512764281                 |
+| lat       | number                       | omitempty | 42.937225341796875         |
+| long      | number                       | omitempty | -71.51953887939453         |
+| eventType | int                          |           | 99                         |
+| matches   | [][match.basic](#basicmatch) |           | See [Match](#basicmatch)   |
 
 ---
 
