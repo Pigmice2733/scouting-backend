@@ -8,6 +8,7 @@ type tbaEvent struct {
 	Lat       *float64 `json:"lat"`
 	Lng       *float64 `json:"lng"`
 	Date      string   `json:"start_date"`
+	EndDate   string   `json:"end_date"`
 }
 
 type tbaMatch struct {

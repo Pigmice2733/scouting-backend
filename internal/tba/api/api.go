@@ -65,7 +65,11 @@ func (c Consumer) GetEvents(year int) ([]event.BasicEvent, error) {
 
 	var bEvents []event.BasicEvent
 	for _, tbaEvent := range tbaEvents {
-		startDate, err := time.Parse("2006-01-02", tbaEvent.Date)
+		date, err := time.Parse("2006-01-02", tbaEvent.Date)
+		if err != nil {
+			return bEvents, err
+		}
+		endDate, err := time.Parse("2006-01-02", tbaEvent.EndDate)
 		if err != nil {
 			return bEvents, err
 		}
@@ -77,7 +81,8 @@ func (c Consumer) GetEvents(year int) ([]event.BasicEvent, error) {
 			EventType: tbaEvent.EventType,
 			Lat:       tbaEvent.Lat,
 			Long:      tbaEvent.Lng,
-			Date:      startDate,
+			Date:      date,
+			EndDate:   endDate,
 		})
 	}
 

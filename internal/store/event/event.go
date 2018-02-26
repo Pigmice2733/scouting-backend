@@ -15,6 +15,7 @@ type BasicEvent struct {
 	Lat       *float64  `json:"lat,omitempty"`
 	Long      *float64  `json:"long,omitempty"`
 	Date      time.Time `json:"date"`
+	EndDate   time.Time `json:"endDate"`
 }
 
 // Event holds basic information about an event as well as matches.

@@ -22,7 +22,7 @@ func New(db *sql.DB) event.Service {
 func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
 	var bEvents []event.BasicEvent
 
-	rows, err := s.db.Query("SELECT key, name, date, shortName, lat, long, eventType FROM events")
+	rows, err := s.db.Query("SELECT key, name, date, endDate, shortName, lat, long, eventType FROM events")
 	if err != nil {
 		return bEvents, err
 	}
@@ -30,7 +30,7 @@ func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
 
 	for rows.Next() {
 		var bEvent event.BasicEvent
-		if err := rows.Scan(&bEvent.Key, &bEvent.Name, &bEvent.Date, &bEvent.ShortName, &bEvent.Lat, &bEvent.Long, &bEvent.EventType); err != nil {
+		if err := rows.Scan(&bEvent.Key, &bEvent.Name, &bEvent.Date, &bEvent.EndDate, &bEvent.ShortName, &bEvent.Lat, &bEvent.Long, &bEvent.EventType); err != nil {
 			return nil, err
 		}
 		bEvents = append(bEvents, bEvent)
@@ -43,8 +43,8 @@ func (s *Service) GetBasicEvents() ([]event.BasicEvent, error) {
 func (s *Service) Get(key string, ms match.Service) (e event.Event, err error) {
 	e.Key = key
 
-	err = s.db.QueryRow("SELECT name, date, shortName, lat, long, eventType FROM events WHERE key = $1", key).Scan(
-		&e.Name, &e.Date, &e.ShortName, &e.Lat, &e.Long, &e.EventType)
+	err = s.db.QueryRow("SELECT name, date, endDate, shortName, lat, long, eventType FROM events WHERE key = $1", key).Scan(
+		&e.Name, &e.Date, &e.EndDate, &e.ShortName, &e.Lat, &e.Long, &e.EventType)
 	if err == sql.ErrNoRows {
 		return e, store.ErrNoResults
 	} else if err != nil {
@@ -60,12 +60,12 @@ func (s *Service) Get(key string, ms match.Service) (e event.Event, err error) {
 // MassUpsert upserts multiple events in the postgres database.
 func (s *Service) MassUpsert(bEvents []event.BasicEvent) error {
 	stmt, err := s.db.Prepare(`
-		INSERT INTO events (key, name, shortName, date, lat, long, eventType)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO events (key, name, shortName, date, endDate, lat, long, eventType)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (key)
 		DO
 			UPDATE
-				SET name = $2, shortName = $3, date = $4, lat = $5, long = $6, eventType = $7
+				SET name = $2, shortName = $3, date = $4, endDate = $5, lat = $6, long = $7, eventType = $8
 		`)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (s *Service) MassUpsert(bEvents []event.BasicEvent) error {
 	defer stmt.Close()
 
 	for _, bEvent := range bEvents {
-		if _, err := stmt.Exec(bEvent.Key, bEvent.Name, bEvent.ShortName, bEvent.Date, bEvent.Lat, bEvent.Long, bEvent.EventType); err != nil {
+		if _, err := stmt.Exec(bEvent.Key, bEvent.Name, bEvent.ShortName, bEvent.Date, bEvent.EndDate, bEvent.Lat, bEvent.Long, bEvent.EventType); err != nil {
 			return err
 		}
 	}

@@ -6,3 +6,5 @@
 
 # Archive JSON
 /cmd/archive/*.json
+
+/vendor
