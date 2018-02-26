@@ -65,11 +65,15 @@ func (c Consumer) GetEvents(year int) ([]event.BasicEvent, error) {
 
 	var bEvents []event.BasicEvent
 	for _, tbaEvent := range tbaEvents {
-		date, err := time.Parse("2006-01-02", tbaEvent.Date)
+		timeZone, err := time.LoadLocation(tbaEvent.TimeZone)
 		if err != nil {
 			return bEvents, err
 		}
-		endDate, err := time.Parse("2006-01-02", tbaEvent.EndDate)
+		date, err := time.ParseInLocation("2006-01-02", tbaEvent.Date, timeZone)
+		if err != nil {
+			return bEvents, err
+		}
+		endDate, err := time.ParseInLocation("2006-01-02", tbaEvent.EndDate, timeZone)
 		if err != nil {
 			return bEvents, err
 		}

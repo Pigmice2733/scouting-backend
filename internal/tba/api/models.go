@@ -9,6 +9,7 @@ type tbaEvent struct {
 	Lng       *float64 `json:"lng"`
 	Date      string   `json:"start_date"`
 	EndDate   string   `json:"end_date"`
+	TimeZone  string   `json:"timezone"`
 }
 
 type tbaMatch struct {
