@@ -182,6 +182,7 @@ The request body can change depending on the schema and data to analyze for the 
 ```json
 {
   "team": "frc2733",
+  "notes": "notes on the team",
   "stats": {
     "climbed": true,
     "movedBunnies": 10,
@@ -203,27 +204,15 @@ The response body can change depending on the schema and data to analyze.
 ```json
 [
   {
-    "team": "frc254",
+    "team": "frc4905",
+    "notes": { "2018week0_qm10": "asdf" },
     "stats": {
-      "climbed": 0.94,
-      "movedBunnies": 7.4,
-      "movedBuckets": 14.2
-    }
-  },
-  {
-    "team": "frc2733",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 68.6,
-      "movedBuckets": 52.3
-    }
-  },
-  {
-    "team": "frc2471",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 67.6,
-      "movedBuckets": 51.3
+      "autoCrossedLine": 0,
+      "autoCubesOnScale": 0,
+      "autoCubesOnSwitch": 0,
+      "hadConnectionProblems": 0,
+      "hadPowerProblems": 0,
+      ...
     }
   }
 ]
@@ -241,10 +230,12 @@ The response body can change depending on the schema and data to analyze.
 
 ```json
 {
-  "climbed": 0.94,
-  "movedBunnies": 7.4,
-  "movedBuckets": 14.2
-}
+  "autoCrossedLine": 0,
+  "autoCubesOnScale": 0,
+  "autoCubesOnSwitch": 0,
+  "hadConnectionProblems": 0,
+  "hadPowerProblems": 0,
+  ...
 ```
 
 ---
@@ -260,27 +251,15 @@ The response body can change depending on the schema and data to analyze.
 ```json
 [
   {
-    "team": "frc254",
+    "team": "frc4905",
+    "notes": { "2018week0_qm10": "asdf" },
     "stats": {
-      "climbed": 0.94,
-      "movedBunnies": 7.4,
-      "movedBuckets": 14.2
-    }
-  },
-  {
-    "team": "frc2733",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 68.6,
-      "movedBuckets": 52.3
-    }
-  },
-  {
-    "team": "frc2471",
-    "stats": {
-      "climbed": 1,
-      "movedBunnies": 67.6,
-      "movedBuckets": 51.3
+      "autoCrossedLine": 0,
+      "autoCubesOnScale": 0,
+      "autoCubesOnSwitch": 0,
+      "hadConnectionProblems": 0,
+      "hadPowerProblems": 0,
+      ...
     }
   }
 ]

@@ -33,13 +33,13 @@ func (s *Service) Upsert(rep report.Report, as alliance.Service) error {
 	}
 
 	_, err = s.db.Exec(`
-		INSERT INTO reports (reporter, isBlue, team, stats, eventKey, matchKey)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO reports (reporter, isBlue, team, stats, notes, eventKey, matchKey)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (eventKey, matchKey, team)
 		DO
 			UPDATE
-				SET reporter = $1, isBlue = $2, team = $3, stats = $4
-	`, rep.Reporter, isBlue, rep.Team, stats.String(), rep.EventKey, rep.MatchKey)
+				SET reporter = $1, isBlue = $2, team = $3, stats = $4, notes = $5
+	`, rep.Reporter, isBlue, rep.Team, stats.String(), rep.Notes, rep.EventKey, rep.MatchKey)
 	return err
 }
 
@@ -89,6 +89,30 @@ func (s *Service) GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data
 	}
 
 	return stats, rows.Err()
+}
+
+// GetNotesByEventAndTeam gets all notes from reports of a certain team at a certain event.
+func (s *Service) GetNotesByEventAndTeam(eventKey, team string) (map[string]string, error) {
+	rows, err := s.db.Query("SELECT matchKey, notes FROM reports WHERE eventKey = $1 AND team = $2 AND notes IS NOT NULL", eventKey, team)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make(map[string]string)
+
+	for rows.Next() {
+		var note string
+		var matchKey string
+
+		if err := rows.Scan(&matchKey, &note); err != nil {
+			return nil, err
+		}
+
+		notes[matchKey] = note
+	}
+
+	return notes, rows.Err()
 }
 
 // GetReporterStats gets a map of all reporters to the amount of reports they have submitted.

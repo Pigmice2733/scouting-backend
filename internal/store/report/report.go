@@ -11,6 +11,7 @@ type Report struct {
 	EventKey string                 `json:"eventKey"`
 	MatchKey string                 `json:"matchKey"`
 	Team     string                 `json:"team"`
+	Notes    *string                `json:"notes"`
 	Stats    map[string]interface{} `json:"stats"`
 }
 
@@ -19,5 +20,6 @@ type Service interface {
 	Upsert(rep Report, as alliance.Service) error
 	GetReportedOn(eventKey string) ([]string, error)
 	GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data, error)
+	GetNotesByEventAndTeam(eventKey, team string) (map[string]string, error)
 	GetReporterStats() (map[string]int, error)
 }
