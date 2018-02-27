@@ -159,9 +159,9 @@ func (s *Server) newHandler(origin string) http.Handler {
 
 		"/photo/{team}": mroute.Simple(http.HandlerFunc(s.photoHandler), "GET", cache),
 
-		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET"),
-		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET"),
-		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET"),
+		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET", s.pollMatchMiddleware),
+		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET", s.pollMatchMiddleware),
+		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET", s.pollMatchMiddleware),
 
 		"/leaderboard": mroute.Simple(http.HandlerFunc(s.leaderboardHandler), "GET"),
 	})
@@ -251,7 +251,11 @@ func (s *Server) pollMatches(eventKey string) {
 
 func (s *Server) pollMatchMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.pollMatches(mux.Vars(r)["eventKey"])
+		eventKey := mux.Vars(r)["eventKey"]
+
+		if eventKey != "" {
+			s.pollMatches(eventKey)
+		}
 
 		next.ServeHTTP(w, r)
 	})
