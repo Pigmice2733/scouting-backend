@@ -76,12 +76,13 @@ See [Event](#event)
 
 ### Go
 
-| Name          | Type      | Tags      | Example              |
-| ------------- | --------- | --------- | -------------------- |
-| Key           | string    |           | "2017cmptx_sf1m13"   |
-| EventKey      | string    | -         | "2017cmptx"          |
-| PredictedTime | time.Time | omitempty | 2017-07-29T15:20:00Z |
-| ActualTime    | time.Time | omitempty | 2017-07-29T15:20:00Z |
+| Name          | Type      | Tags      | Example                                       |
+| ------------- | --------- | --------- | --------------------------------------------- |
+| Key           | string    |           | "2017cmptx_sf1m13"                            |
+| EventKey      | string    | -         | "2017cmptx"                                   |
+| PredictedTime | time.Time | omitempty | 2017-07-29T15:20:00Z                          |
+| ActualTime    | time.Time | omitempty | 2017-07-29T15:20:00Z                          |
+| YoutubeURL    | string    |           | "https://www.youtube.com/watch?v=dTjzn4HCP-o" |
 
 ### PostgreSQL
 
@@ -89,11 +90,12 @@ See [Match](#match)
 
 ### JSON
 
-| Name          | Type   | Comments      | Example                |
-| ------------- | ------ | ------------- | ---------------------- |
-| key           | string |               | "2017cmptx_sf1m13"     |
-| predictedTime | string | Omit if empty | "2017-07-29T15:20:00Z" |
-| actualTime    | string | Omit if empty | "2017-07-29T15:20:00Z" |
+| Name          | Type   | Comments      | Example                                       |
+| ------------- | ------ | ------------- | --------------------------------------------- |
+| key           | string |               | "2017cmptx_sf1m13"                            |
+| predictedTime | string | Omit if empty | "2017-07-29T15:20:00Z"                        |
+| actualTime    | string | Omit if empty | "2017-07-29T15:20:00Z"                        |
+| youtubeURL    | string |               | "https://www.youtube.com/watch?v=dTjzn4HCP-o" |
 
 ---
 
@@ -109,14 +111,15 @@ See [Match](#match)
 
 ### PostgreSQL
 
-| Name          | Type             | Constraints                                  | Example                         |
-| ------------- | ---------------- | -------------------------------------------- | ------------------------------- |
-| key           | TEXT PRIMARY KEY |                                              | "2017cmptx_sf1m13"              |
-| eventKey      | TEXT NOT NULL    | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"                     |
-| predictedTime | TIMESTAMPTZ      |                                              | 2017-04-21 17:00:00 -0700 -0700 |
-| actualTime    | TIMESTAMPTZ      |                                              | 2017-04-21 17:00:00 -0700 -0700 |
-| redScore      | INTEGER          |                                              | 83                              |
-| blueScore     | INTEGER          |                                              | 96                              |
+| Name          | Type             | Constraints                                  | Example                                       |
+| ------------- | ---------------- | -------------------------------------------- | --------------------------------------------- |
+| key           | TEXT PRIMARY KEY |                                              | "2017cmptx_sf1m13"                            |
+| eventKey      | TEXT NOT NULL    | FOREIGN KEY(eventKey) REFERENCES events(key) | "2017cmptx"                                   |
+| predictedTime | TIMESTAMPTZ      |                                              | 2017-04-21 17:00:00 -0700 -0700               |
+| actualTime    | TIMESTAMPTZ      |                                              | 2017-04-21 17:00:00 -0700 -0700               |
+| redScore      | INTEGER          |                                              | 83                                            |
+| blueScore     | INTEGER          |                                              | 96                                            |
+| youtubeURL    | TEXT             |                                              | "https://www.youtube.com/watch?v=dTjzn4HCP-o" |
 
 ### JSON
 

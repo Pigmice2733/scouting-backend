@@ -137,12 +137,14 @@ Gets a complete event including matches.
     {
       "key": "2018week0_f1m1",
       "predictedTime": "2018-02-17T12:57:09-08:00",
-      "actualTime": "2018-02-17T12:58:26-08:00"
+      "actualTime": "2018-02-17T12:58:26-08:00",
+      "youtubeURL": "https://www.youtube.com/watch?v=dTjzn4HCP-o"
     },
     {
       "key": "2018week0_f1m2",
       "predictedTime": "2018-02-17T13:11:01-08:00",
-      "actualTime": "2018-02-17T13:11:59-08:00"
+      "actualTime": "2018-02-17T13:11:59-08:00",
+      "youtubeURL": "https://www.youtube.com/watch?v=dTjzn4HCP-o"
     },
     ...
   ]
@@ -162,6 +164,7 @@ Gets a complete match.
   "key": "2017nhfoc_f1m1",
   "predictedTime": "2017-07-29T15:20:00Z",
   "actualTime": "2017-07-29T15:20:42Z",
+  "youtubeURL": "https://www.youtube.com/watch?v=dTjzn4HCP-o",
   "redScore": 508,
   "blueScore": 342,
   "redAlliance": ["frc1011", "frc5499", "frc973"],
