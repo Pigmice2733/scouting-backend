@@ -147,6 +147,7 @@ func (c Consumer) GetMatches(eventKey string) ([]match.Match, error) {
 				EventKey:      eventKey,
 				PredictedTime: predictedMatchTime,
 				ActualTime:    actualMatchTime,
+				YoutubeURL:    youtubeURL,
 			},
 			RedScore:     tbaMatch.Alliances.Red.Score,
 			BlueScore:    tbaMatch.Alliances.Blue.Score,

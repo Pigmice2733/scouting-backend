@@ -10,6 +10,7 @@ import (
 type BasicMatch struct {
 	Key           string     `json:"key"`
 	EventKey      string     `json:"-"`
+	YoutubeURL    string     `json:"youtubeURL"`
 	PredictedTime *time.Time `json:"predictedTime,omitempty"`
 	ActualTime    *time.Time `json:"actualTime,omitempty"`
 }

@@ -22,7 +22,7 @@ func New(db *sql.DB) match.Service {
 func (s *Service) GetBasicMatches(eventKey string) ([]match.BasicMatch, error) {
 	var bMatches []match.BasicMatch
 
-	rows, err := s.db.Query("SELECT key, predictedTime, actualTime FROM matches WHERE eventKey = $1", eventKey)
+	rows, err := s.db.Query("SELECT key, predictedTime, actualTime, youtubeURL FROM matches WHERE eventKey = $1", eventKey)
 	if err != nil {
 		return bMatches, err
 	}
@@ -30,7 +30,7 @@ func (s *Service) GetBasicMatches(eventKey string) ([]match.BasicMatch, error) {
 
 	for rows.Next() {
 		var bMatch match.BasicMatch
-		if err := rows.Scan(&bMatch.Key, &bMatch.PredictedTime, &bMatch.ActualTime); err != nil {
+		if err := rows.Scan(&bMatch.Key, &bMatch.PredictedTime, &bMatch.ActualTime, &bMatch.YoutubeURL); err != nil {
 			return nil, err
 		}
 
