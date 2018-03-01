@@ -28,6 +28,10 @@ type tbaMatch struct {
 			Teams []string `json:"team_keys"`
 		} `json:"red"`
 	} `json:"alliances"`
+	Videos []struct {
+		Key  string `json:"key"`
+		Type string `json:"type"`
+	} `json:"videos"`
 }
 
 type media struct {

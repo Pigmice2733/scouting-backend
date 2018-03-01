@@ -46,8 +46,8 @@ func (s *Service) Get(eventKey, matchKey string, as alliance.Service) (m match.M
 	m.Key = matchKey
 	m.EventKey = eventKey
 
-	err = s.db.QueryRow("SELECT predictedTime, actualTime, redScore, blueScore FROM matches WHERE eventKey = $1 AND key = $2", eventKey, matchKey).Scan(
-		&m.PredictedTime, &m.ActualTime, &m.RedScore, &m.BlueScore)
+	err = s.db.QueryRow("SELECT predictedTime, actualTime, redScore, blueScore, youtubeURL FROM matches WHERE eventKey = $1 AND key = $2", eventKey, matchKey).Scan(
+		&m.PredictedTime, &m.ActualTime, &m.RedScore, &m.BlueScore, &m.YoutubeURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return m, store.ErrNoResults
@@ -68,14 +68,14 @@ func (s *Service) Get(eventKey, matchKey string, as alliance.Service) (m match.M
 // MassUpsert upserts multiple events in the postgres database.
 func (s *Service) MassUpsert(matches []match.Match, as alliance.Service) error {
 	stmt, err := s.db.Prepare(`
-		INSERT INTO matches (key, eventKey, predictedTime, actualTime, redScore, blueScore)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO matches (key, eventKey, predictedTime, actualTime, redScore, blueScore, youtubeURL)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (key)
 		DO
 			UPDATE
 				SET
 					eventKey = $2, predictedTime = $3, actualTime = $4,
-					redScore = $5, blueScore = $6
+					redScore = $5, blueScore = $6, youtubeURL = $7
 		`)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (s *Service) MassUpsert(matches []match.Match, as alliance.Service) error {
 	for _, match := range matches {
 		if _, err := stmt.Exec(
 			match.Key, match.EventKey, match.PredictedTime, match.ActualTime,
-			match.RedScore, match.BlueScore); err != nil {
+			match.RedScore, match.BlueScore, match.YoutubeURL); err != nil {
 			return err
 		}
 		if err := as.Upsert(match.Key, false, match.RedAlliance); err != nil {

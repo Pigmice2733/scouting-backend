@@ -17,6 +17,7 @@ type BasicMatch struct {
 // Match holds basic match information and alliance info for the match.
 type Match struct {
 	BasicMatch
+	YoutubeURL   string   `json:"youtubeURL"`
 	RedScore     int      `json:"redScore"`
 	BlueScore    int      `json:"blueScore"`
 	RedAlliance  []string `json:"redAlliance"`

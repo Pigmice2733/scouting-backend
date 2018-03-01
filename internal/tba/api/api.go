@@ -16,6 +16,7 @@ import (
 var lastModified = lastmodified.New()
 
 const imgurFormat = "http://i.imgur.com/%sl.jpg"
+const youtubeFormat = "https://www.youtube.com/watch?v=%s"
 
 // Consumer consumes info from the TBA api.
 type Consumer struct {
@@ -97,7 +98,7 @@ func (c Consumer) GetEvents(year int) ([]event.BasicEvent, error) {
 
 // GetMatches retrieves all associated matches from the blue alliance API.
 func (c Consumer) GetMatches(eventKey string) ([]match.Match, error) {
-	path := fmt.Sprintf("%s/event/%s/matches/simple", c.tbaURL, eventKey)
+	path := fmt.Sprintf("%s/event/%s/matches", c.tbaURL, eventKey)
 
 	resp, err := c.makeRequest(path)
 	if err != nil {
@@ -133,6 +134,13 @@ func (c Consumer) GetMatches(eventKey string) ([]match.Match, error) {
 			actualMatchTime = &actualTime
 		}
 
+		var youtubeURL string
+		for _, video := range tbaMatch.Videos {
+			if video.Type == "youtube" {
+				youtubeURL = fmt.Sprintf(youtubeFormat, video.Key)
+			}
+		}
+
 		bMatches = append(bMatches, match.Match{
 			BasicMatch: match.BasicMatch{
 				Key:           tbaMatch.Key,
@@ -144,6 +152,7 @@ func (c Consumer) GetMatches(eventKey string) ([]match.Match, error) {
 			BlueScore:    tbaMatch.Alliances.Blue.Score,
 			RedAlliance:  tbaMatch.Alliances.Red.Teams,
 			BlueAlliance: tbaMatch.Alliances.Blue.Teams,
+			YoutubeURL:   youtubeURL,
 		})
 	}
 
