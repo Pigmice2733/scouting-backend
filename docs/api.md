@@ -49,7 +49,7 @@ Gets all users.
 
 ## /users - POST - Authenticated (Admin Users Only)
 
-Creates a new user.
+Creates a new user. Usernames can only contain alphanumeric + space characters.
 
 ### Request Body
 
