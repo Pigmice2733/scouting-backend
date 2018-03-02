@@ -78,6 +78,11 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(reqUser.Username) == 0 {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
 	for _, ch := range reqUser.Username {
 		if !strings.Contains(allowedChars, string(ch)) {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
