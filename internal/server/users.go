@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+	"regexp"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store"
 
@@ -68,7 +68,7 @@ func (s *Server) getUsersHandler(w http.ResponseWriter, r *http.Request) {
 	respond.JSON(w, resp)
 }
 
-const allowedChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "
+var usernameRegex = regexp.MustCompile(`^[0-9A-Za-z\s]+$`)
 
 func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var reqUser requestUser
@@ -83,11 +83,9 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, ch := range reqUser.Username {
-		if !strings.Contains(allowedChars, string(ch)) {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
+	if !usernameRegex.Match([]byte(reqUser.Username)) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reqUser.Password), bcrypt.DefaultCost)
