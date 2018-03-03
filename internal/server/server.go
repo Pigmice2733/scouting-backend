@@ -153,7 +153,7 @@ func (s *Server) newHandler(origin string) http.Handler {
 		"/events/{eventKey}":            mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cache, s.pollMatchMiddleware),
 		"/events/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cache, s.pollMatchMiddleware),
 
-		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", cache, s.authHandler),
+		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", s.authHandler),
 
 		"/schema": mroute.Simple(http.HandlerFunc(s.schemaHandler), "GET", cache),
 

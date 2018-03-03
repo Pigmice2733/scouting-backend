@@ -11,6 +11,8 @@ import (
 )
 
 func (s *Server) reportHandler(w http.ResponseWriter, r *http.Request) {
+	s.logger.LogJSON(map[string]interface{}{"vars": mux.Vars(r)})
+
 	var rep report.Report
 	if err := json.NewDecoder(r.Body).Decode(&rep); err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
