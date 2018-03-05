@@ -1,6 +1,11 @@
-# Peregrine [![Go Report Card](https://goreportcard.com/badge/github.com/pigmice2733/scouting-backend)](https://goreportcard.com/report/github.com/pigmice2733/scouting-backend) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center"><img src="https://raw.githubusercontent.com/Pigmice2733/peregrine-logo/master/logo-with-text.png"></p>
 
-A scouting app designed by Pigmice (2733).
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/pigmice2733/scouting-backend"><img src="https://goreportcard.com/badge/github.com/pigmice2733/scouting-backend" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg"></img></a>
+</p>
+
+Backend for the Pigmice scouting app
 
 ## Environment Variables
 
