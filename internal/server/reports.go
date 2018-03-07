@@ -1,10 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/Pigmice2733/scouting-backend/internal/analysis"
@@ -13,13 +11,8 @@ import (
 )
 
 func (s *Server) reportHandler(w http.ResponseWriter, r *http.Request) {
-	buf := new(bytes.Buffer)
-	io.Copy(buf, r.Body)
-
-	s.logger.LogJSON(map[string]interface{}{"vars": mux.Vars(r), "body": buf.String()})
-
 	var rep report.Report
-	if err := json.NewDecoder(buf).Decode(&rep); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&rep); err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
