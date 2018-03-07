@@ -43,7 +43,7 @@ func (s *Server) teamAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respond.JSON(w, resp[0].Stats)
+	respond.JSON(w, resp[0])
 }
 
 func (s *Server) allianceAnalysisHandler(w http.ResponseWriter, r *http.Request) {

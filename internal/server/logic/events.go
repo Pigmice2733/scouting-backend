@@ -10,9 +10,10 @@ import (
 
 // TeamAnalysis holds information about a team, and their analyzed performance.
 type TeamAnalysis struct {
-	Team  string            `json:"team"`
-	Notes map[string]string `json:"notes"`
-	Stats analysis.Results  `json:"stats"`
+	Team    string            `json:"team"`
+	Notes   map[string]string `json:"notes"`
+	Reports int               `json:"reports"`
+	Stats   analysis.Results  `json:"stats"`
 }
 
 // EventAnalysis gets information about how all teams at an event performed.
@@ -59,7 +60,7 @@ func Analyze(eventKey string, teams []string, schema analysis.Schema, rs report.
 			return nil, fmt.Errorf("getting notes: %v", err)
 		}
 
-		teamAnalyses = append(teamAnalyses, TeamAnalysis{Team: team, Notes: notes, Stats: results})
+		teamAnalyses = append(teamAnalyses, TeamAnalysis{Team: team, Notes: notes, Stats: results, Reports: len(stats)})
 	}
 
 	return teamAnalyses, nil

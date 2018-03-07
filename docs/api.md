@@ -196,6 +196,29 @@ The request body can change depending on the schema and data to analyze for the 
 
 ---
 
+## /reports/{eventKey}/{team} - GET
+
+Retrieve all reports for the specified team and event
+
+### Response Body
+
+```json
+[
+  {
+    "reporter": "JohnSmith2",
+    "team": "frc2733",
+    "notes": "notes on the team",
+    "stats": {
+      "climbed": true,
+      "movedBunnies": 10,
+      "movedBuckets": 5
+    }
+  }
+]
+```
+
+---
+
 ## /analysis/{eventKey} - GET
 
 Stats about how all teams in an event have performed on average.
@@ -209,6 +232,7 @@ The response body can change depending on the schema and data to analyze.
   {
     "team": "frc4905",
     "notes": { "2018week0_qm10": "asdf" },
+    "reports": 6,
     "stats": {
       "autoCrossedLine": 0,
       "autoCubesOnScale": 0,
@@ -233,12 +257,18 @@ The response body can change depending on the schema and data to analyze.
 
 ```json
 {
-  "autoCrossedLine": 0,
-  "autoCubesOnScale": 0,
-  "autoCubesOnSwitch": 0,
-  "hadConnectionProblems": 0,
-  "hadPowerProblems": 0,
-  ...
+  "team": "frc4905",
+  "notes": { "2018week0_qm10": "asdf" },
+  "reports": 6,
+  "stats": {
+    "autoCrossedLine": 0,
+    "autoCubesOnScale": 0,
+    "autoCubesOnSwitch": 0,
+    "hadConnectionProblems": 0,
+    "hadPowerProblems": 0,
+    ...
+  }
+}
 ```
 
 ---
@@ -256,6 +286,7 @@ The response body can change depending on the schema and data to analyze.
   {
     "team": "frc4905",
     "notes": { "2018week0_qm10": "asdf" },
+    "reports": 6,
     "stats": {
       "autoCrossedLine": 0,
       "autoCubesOnScale": 0,

@@ -37,7 +37,7 @@ func Simple(h http.Handler, method string, Middlewares ...Middleware) Route {
 // cache, then the handler).
 func HandleRoutes(r *mux.Router, routes map[string]Route) {
 	for path, route := range routes {
-		r.Handle(path, routeHandler(route))
+		r.Handle(path, routeHandler(route)).Methods(append(route.Methods, "OPTIONS")...)
 	}
 }
 
@@ -47,14 +47,7 @@ func routeHandler(route Route) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		methods := append(route.Methods, "OPTIONS")
-
-		if !existsIn(r.Method, methods) {
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(methods, ","))
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(append(route.Methods, "OPTIONS"), ","))
 
 		if r.Method == "OPTIONS" {
 			return

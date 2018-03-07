@@ -21,5 +21,7 @@ type Service interface {
 	GetReportedOn(eventKey string) ([]string, error)
 	GetStatsByEventAndTeam(eventKey, team string) ([]analysis.Data, error)
 	GetNotesByEventAndTeam(eventKey, team string) (map[string]string, error)
+	GetReportsByEventAndTeam(eventKey, team string) ([]Report, error)
+	GetReportsByTeam(team string) ([]Report, error)
 	GetReporterStats() (map[string]int, error)
 }

@@ -27,19 +27,15 @@ func (s *Service) Upsert(rep report.Report, as alliance.Service) error {
 		return err
 	}
 
-	isBlue, err := as.GetColor(rep.MatchKey, rep.Team)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.db.Exec(`
-		INSERT INTO reports (reporter, isBlue, team, stats, notes, eventKey, matchKey)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	_, err := s.db.Exec(`
+		INSERT INTO reports (reporter, team, stats, notes, eventKey, matchKey)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (eventKey, matchKey, team)
 		DO
 			UPDATE
-				SET reporter = $1, isBlue = $2, team = $3, stats = $4, notes = $5
-	`, rep.Reporter, isBlue, rep.Team, stats.String(), rep.Notes, rep.EventKey, rep.MatchKey)
+				SET reporter = $1, team = $2, stats = $3, notes = $4
+	`, rep.Reporter, rep.Team, stats.String(), rep.Notes, rep.EventKey, rep.MatchKey)
+
 	return err
 }
 
@@ -113,6 +109,67 @@ func (s *Service) GetNotesByEventAndTeam(eventKey, team string) (map[string]stri
 	}
 
 	return notes, rows.Err()
+}
+
+// GetReportsByEventAndTeam gets all reports on a certain team at a certain event.
+func (s *Service) GetReportsByEventAndTeam(eventKey, team string) ([]report.Report, error) {
+	rows, err := s.db.Query("SELECT reporter, matchKey, stats, notes FROM reports WHERE eventKey = $1 AND team = $2", eventKey, team)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reports []report.Report
+
+	for rows.Next() {
+		var rep report.Report
+		var statsStr string
+
+		if err := rows.Scan(&rep.Reporter, &rep.MatchKey, &statsStr, &rep.Notes); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(statsStr), &rep.Stats); err != nil {
+			return nil, err
+		}
+
+		rep.EventKey = eventKey
+		rep.Team = team
+
+		reports = append(reports, rep)
+	}
+
+	return reports, rows.Err()
+}
+
+// GetReportsByTeam gets all reports on a certain team from all events.
+func (s *Service) GetReportsByTeam(team string) ([]report.Report, error) {
+	rows, err := s.db.Query("SELECT reporter, eventKey, matchKey, stats, notes FROM reports WHERE team = $1", team)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reports []report.Report
+
+	for rows.Next() {
+		var rep report.Report
+		var statsStr string
+
+		if err := rows.Scan(&rep.Reporter, &rep.EventKey, &rep.MatchKey, &statsStr, &rep.Notes); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(statsStr), &rep.Stats); err != nil {
+			return nil, err
+		}
+
+		rep.Team = team
+
+		reports = append(reports, rep)
+	}
+
+	return reports, rows.Err()
 }
 
 // GetReporterStats gets a map of all reporters to the amount of reports they have submitted.

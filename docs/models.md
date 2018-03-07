@@ -52,8 +52,8 @@ See [Event](#event)
 | shortName | TEXT             |             | "Einstein (Houston)"       |
 | date      | TIMESTAMPTZ      | NOT NULL    | 2017-07-29T15:20:00Z       |
 | endDate   | TIMESTAMPTZ      | NOT NULL    | 2017-07-29T15:20:00Z       |
-| Lat       | REAL             |             | 42.937225341796875         |
-| Long      | REAL             |             | -71.51953887939453         |
+| lat       | REAL             |             | 42.937225341796875         |
+| long      | REAL             |             | -71.51953887939453         |
 | eventType | INTEGER          | NOT NULL    | 99                         |
 
 ### JSON
@@ -137,7 +137,7 @@ See [Match](#match)
 
 ### Go
 
-An Alliance is just a []string in Go.
+An Alliance is just a []string of team numbers in Go.
 
 ### PostgreSQL
 
@@ -163,29 +163,29 @@ An Alliance is just an array of strings (team numbers) in js.
 | Reporter | string                 |      | "JohnSmith2"       |
 | EventKey | string                 |      | "2017cmptx"        |
 | MatchKey | string                 |      | "2017cmptx_sf1m13" |
-| IsBlue   | bool                   |      | true               |
 | Team     | string                 |      | "frc2740b"         |
+| Notes    | \*string               |      | "Fast scale auto"  |
 | Stats    | map[string]interface{} |      |                    |
 
 ### PostgreSQL
 
-| Name     | Type    | Constraints                                               | Example            |
-| -------- | ------- | --------------------------------------------------------- | ------------------ |
-| reporter | TEXT    | NOT NULL FOREIGN KEY(reporter) REFERENCES users(username) | "JohnSmith2"       |
-| eventKey | TEXT    | NOT NULL FOREIGN KEY(eventKey) REFERENCES events(key)     | "2017cmptx"        |
-| matchKey | TEXT    | NOT NULL FOREIGN KEY(matchKey) REFERENCES matches(key)    | "2017cmptx_sf1m13" |
-| isBlue   | BOOLEAN | NOT NULL                                                  | true               |
-| team     | TEXT    | NOT NULL                                                  | "frc2740b"         |
-| stats    | TEXT    | NOT NULL                                                  |                    |
-|          |         | UNIQUE(eventKey, matchKey)                                |                    |
+| Name     | Type | Constraints                                               | Example            |
+| -------- | ---- | --------------------------------------------------------- | ------------------ |
+| reporter | TEXT | NOT NULL FOREIGN KEY(reporter) REFERENCES users(username) | "JohnSmith2"       |
+| eventKey | TEXT | NOT NULL FOREIGN KEY(eventKey) REFERENCES events(key)     | "2017cmptx"        |
+| matchKey | TEXT | NOT NULL FOREIGN KEY(matchKey) REFERENCES matches(key)    | "2017cmptx_sf1m13" |
+| team     | TEXT | NOT NULL                                                  | "frc2740b"         |
+| notes    | TEXT |                                                           |                    |
+| stats    | TEXT | NOT NULL                                                  |                    |
+|          |      | UNIQUE(eventKey, matchKey)                                |                    |
 
 ### JSON
 
 | Name     | Type   | Comments | Example                                        |
 | -------- | ------ | -------- | ---------------------------------------------- |
 | reporter | string |          | "JohnSmith2"                                   |
-| isBlue   | bool   |          | true                                           |
 | team     | string |          | ["frc2471", "frc2733", "frc1418"]              |
+| notes    | string |          | "Fast scale auto"                              |
 | stats    | object |          | { climbed: true, gears: 6, crossedLine: true } |
 
 ---
@@ -216,7 +216,7 @@ An Alliance is just an array of strings (team numbers) in js.
 | hashedPassword | string |          | "notarealhash" |
 | isAdmin        | bool   |          | true           |
 
---
+---
 
 ## Photo
 
@@ -228,7 +228,7 @@ An Alliance is just an array of strings (team numbers) in js.
 | url  | TEXT NOT NULL |                   | "http://i.imgur.com/uN3ojZyl.jpg" |
 |      |               | UNIQUE(team, url) |                                   |
 
---
+---
 
 ## JWT Body
 
