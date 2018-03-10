@@ -9,5 +9,5 @@
 	"autoCubesOnSwitch": "number",
 	"hadConnectionProblems": "bool",
 	"hadPowerProblems": "bool",
-	"present": "bool"
+	"absent": "bool"
 }
