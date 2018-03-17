@@ -1,9 +1,11 @@
 {
 	"teleopCubesOnScale": "number",
 	"teleopCubesOnSwitch": "number",
-	"teleopClimbed": "bool",
 	"teleopEndsOnPlatform": "bool",
 	"teleopCubesIntoExchange": "number",
+	"teleopClimbedSelf": "bool",
+	"teleopClimbedOnPartner": "bool",
+	"helpedPartnersClimb": "number",
 	"autoCrossedLine": "bool",
 	"autoCubesOnScale": "number",
 	"autoCubesOnSwitch": "number",

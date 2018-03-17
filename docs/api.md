@@ -196,7 +196,7 @@ The request body can change depending on the schema and data to analyze for the 
 
 ---
 
-## /reports/{eventKey}/{team} - GET
+## /reports/{eventKey}/{team}/raw - GET
 
 Retrieve all reports for the specified team and event
 
@@ -214,6 +214,38 @@ Retrieve all reports for the specified team and event
       "movedBuckets": 5
     }
   }
+]
+```
+
+---
+
+## /reports/{team}/raw - GET
+
+Retrieve all reports for a team.
+
+```json
+[
+  {
+    "reporter": "Dexter",
+    "eventKey": "2018orwil",
+    "matchKey": "2018orwil_qm3",
+    "team": "frc4488",
+    "notes": null,
+    "stats": {
+      "autoCrossedLine": true,
+      "autoCubesOnScale": 0,
+      "autoCubesOnSwitch": 0,
+      "hadConnectionProblems": true,
+      "hadPowerProblems": false,
+      "present": true,
+      "teleopClimbed": false,
+      "teleopCubesIntoExchange": 1,
+      "teleopCubesOnScale": 1,
+      "teleopCubesOnSwitch": 1,
+      "teleopEndsOnPlatform": false
+    }
+  }
+  ...
 ]
 ```
 
