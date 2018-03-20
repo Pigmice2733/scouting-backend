@@ -333,6 +333,115 @@ The response body can change depending on the schema and data to analyze.
 
 ---
 
+## /picklists - GET - Authenticated
+
+Retrieves all of the authenticated users basic picklist info.
+
+### Response Body
+
+```json
+[
+  {
+    "id": 17,
+    "eventKey": "2018orwil",
+    "name": "climbers",
+  },
+  {
+    "id": 20,
+    "eventKey": "2018orwil",
+    "name": "switch"
+  },
+  {
+    "id": 6,
+    "eventKey": "2018orore",
+    "name": "switch"
+  }
+  ...
+]
+```
+
+---
+
+## /picklists/event/{eventKey} - GET - Authenticated
+
+Retrieves all of the authenticated users basic picklist info for a specific event.
+
+### Response Body
+
+```json
+[
+  {
+    "id": 17,
+    "eventKey": "2018orwil",
+    "name": "climbers"
+  },
+  {
+    "id": 20,
+    "eventKey": "2018orwil",
+    "name": "switch"
+  }
+  ...
+]
+```
+
+---
+
+## /picklists - POST - Authenticated
+
+Creates a new picklist for the authenticated user.
+
+### Request Body
+
+```json
+{
+  "eventKey": "2018orwil",
+  "name": "climbers",
+  "list": ["frc2733", "frc2471", "frc254"]
+}
+```
+
+### Response Body
+
+```json
+17
+```
+
+---
+
+## /picklists/{id} - GET
+
+Gets a picklist with a given ID.
+
+### Response Body
+
+```json
+{
+  "id": 6,
+  "eventKey": "2018orore",
+  "name": "switch",
+  "list": ["frc2733", "frc2471", "frc118"],
+  "owner": "franklin"
+}
+```
+
+---
+
+## /picklists/{id} - PUT - Authenticated (and resource belongs to authenticated user)
+
+Updates a picklist with a given ID.
+
+### Request Body
+
+```json
+{
+  "eventKey": "2018orore",
+  "name": "switch",
+  "list": ["frc2733", "frc2471", "frc254"]
+}
+```
+
+---
+
 ## /schema
 
 Sends the report schema.

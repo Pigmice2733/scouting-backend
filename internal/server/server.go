@@ -165,6 +165,23 @@ func (s *Server) newHandler(origin string) http.Handler {
 		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET", s.pollMatchMiddleware),
 		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET", s.pollMatchMiddleware),
 
+		"/picklists": {
+			Handler: mroute.Multi(map[string]http.Handler{
+				"GET":  http.HandlerFunc(s.picklistsHandler),
+				"POST": http.HandlerFunc(s.newPicklistHandler),
+			}),
+			Methods:     []string{"GET", "POST"},
+			Middlewares: []mroute.Middleware{s.authHandler},
+		},
+		"/picklists/{id}": {
+			Handler: mroute.Multi(map[string]http.Handler{
+				"GET": http.HandlerFunc(s.picklistHandler),
+				"PUT": s.authHandler(http.HandlerFunc(s.updatePicklistHandler)),
+			}),
+			Methods: []string{"GET", "PUT"},
+		},
+		"/picklists/event/{eventKey}": mroute.Simple(http.HandlerFunc(s.picklistEventHandler), "GET", s.authHandler),
+
 		"/leaderboard": mroute.Simple(http.HandlerFunc(s.leaderboardHandler), "GET"),
 	})
 

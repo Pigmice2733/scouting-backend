@@ -5,6 +5,7 @@ import (
 
 	"github.com/Pigmice2733/scouting-backend/internal/store/alliance"
 	"github.com/Pigmice2733/scouting-backend/internal/store/photo"
+	"github.com/Pigmice2733/scouting-backend/internal/store/picklist"
 	"github.com/Pigmice2733/scouting-backend/internal/store/report"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store/match"
@@ -24,4 +25,5 @@ type Service struct {
 	Report   report.Service
 	User     user.Service
 	Photo    photo.Service
+	Picklist picklist.Service
 }
