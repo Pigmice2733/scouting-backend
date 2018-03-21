@@ -151,6 +151,7 @@ func (s *Server) newHandler(origin string) http.Handler {
 
 		"/events":                       mroute.Simple(http.HandlerFunc(s.eventsHandler), "GET", cache),
 		"/events/{eventKey}":            mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cache, s.pollMatchMiddleware),
+		"/events/{eventKey}/teams":      mroute.Simple(http.HandlerFunc(s.teamsAtEventHandler), "GET", cache),
 		"/events/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cache, s.pollMatchMiddleware),
 
 		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", s.authHandler),
@@ -186,6 +187,19 @@ func (s *Server) newHandler(origin string) http.Handler {
 	})
 
 	return cors(limitBody(router), origin)
+}
+
+func (s *Server) teamsAtEventHandler(w http.ResponseWriter, r *http.Request) {
+	eventKey := mux.Vars(r)["eventKey"]
+
+	teams, err := s.store.Report.GetReportedOn(eventKey)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		s.logger.LogRequestError(r, fmt.Errorf("getting reported on: %v", err))
+		return
+	}
+
+	respond.JSON(w, teams)
 }
 
 func (s *Server) photoHandler(w http.ResponseWriter, r *http.Request) {

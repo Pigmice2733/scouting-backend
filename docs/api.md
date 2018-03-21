@@ -458,6 +458,18 @@ Sends the report schema.
 
 ---
 
+## /events/{eventKey}/teams - GET
+
+Gets all teams at an event that have been reported on.
+
+## Response Body
+
+```json
+["frc2733", "frc2471", "frc254"]
+```
+
+---
+
 ## /photo/{team}
 
 Responds with the (binary) photo for given team.
