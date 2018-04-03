@@ -149,22 +149,22 @@ func (s *Server) newHandler(origin string) http.Handler {
 			Middlewares: []mroute.Middleware{s.authHandler},
 		},
 
-		"/events":                       mroute.Simple(http.HandlerFunc(s.eventsHandler), "GET", cache),
-		"/events/{eventKey}":            mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cache, s.pollMatchMiddleware),
-		"/events/{eventKey}/teams":      mroute.Simple(http.HandlerFunc(s.teamsAtEventHandler), "GET", cache),
-		"/events/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cache, s.pollMatchMiddleware),
+		"/events":                               mroute.Simple(http.HandlerFunc(s.eventsHandler), "GET", cache),
+		"/events/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventHandler), "GET", cache, s.pollMatchMiddleware),
+		"/events/{eventKey}/teams":              mroute.Simple(http.HandlerFunc(s.teamsAtEventHandler), "GET", cache),
+		"/events/{eventKey}/matches/{matchKey}": mroute.Simple(http.HandlerFunc(s.matchHandler), "GET", cache, s.pollMatchMiddleware),
 
-		"/reports/{eventKey}/{matchKey}": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", s.authHandler),
-		"/reports/{eventKey}/{team}/raw": mroute.Simple(http.HandlerFunc(s.getTeamEventReportsHandler), "GET", cache, s.pollMatchMiddleware),
-		"/reports/{team}/raw":            mroute.Simple(http.HandlerFunc(s.getTeamReportsHandler), "GET", cache, s.pollMatchMiddleware),
+		"/events/{eventKey}/matches/{matchKey}/reports": mroute.Simple(http.HandlerFunc(s.reportHandler), "PUT", s.authHandler),
+		"/events/{eventKey}/teams/{team}/reports":       mroute.Simple(http.HandlerFunc(s.getTeamEventReportsHandler), "GET", cache, s.pollMatchMiddleware),
+		"/teams/{team}/reports":                         mroute.Simple(http.HandlerFunc(s.getTeamReportsHandler), "GET", cache, s.pollMatchMiddleware),
 
 		"/schema": mroute.Simple(http.HandlerFunc(s.schemaHandler), "GET", cache),
 
 		"/photo/{team}": mroute.Simple(http.HandlerFunc(s.photoHandler), "GET", cache),
 
-		"/analysis/{eventKey}":                    mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET", s.pollMatchMiddleware),
-		"/analysis/{eventKey}/{team}":             mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET", s.pollMatchMiddleware),
-		"/analysis/{eventKey}/{matchKey}/{color}": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET", s.pollMatchMiddleware),
+		"/events/{eventKey}/analysis":                                     mroute.Simple(http.HandlerFunc(s.eventAnalysisHandler), "GET", s.pollMatchMiddleware),
+		"/events/{eventKey}/teams/{team}/analysis":                        mroute.Simple(http.HandlerFunc(s.teamAnalysisHandler), "GET", s.pollMatchMiddleware),
+		"/events/{eventKey}/matches/{matchKey}/alliance/{color}/analysis": mroute.Simple(http.HandlerFunc(s.allianceAnalysisHandler), "GET", s.pollMatchMiddleware),
 
 		"/picklists": {
 			Handler: mroute.Multi(map[string]http.Handler{

@@ -153,7 +153,7 @@ Gets a complete event including matches.
 
 ---
 
-## /events/{eventKey}/{matchKey} - GET
+## /events/{eventKey}/matches/{matchKey} - GET
 
 Gets a complete match.
 
@@ -174,7 +174,7 @@ Gets a complete match.
 
 ---
 
-## /reports/{eventKey}/{matchKey} - PUT - Authenticated
+## /events/{eventKey}/matches/{matchKey}/reports - PUT - Authenticated
 
 Upserts a report
 
@@ -196,7 +196,7 @@ The request body can change depending on the schema and data to analyze for the 
 
 ---
 
-## /reports/{eventKey}/{team}/raw - GET
+## /events/{eventKey}/teams/{team}/reports - GET
 
 Retrieve all reports for the specified team and event
 
@@ -219,7 +219,7 @@ Retrieve all reports for the specified team and event
 
 ---
 
-## /reports/{team}/raw - GET
+## /teams/{team}/reports - GET
 
 Retrieve all reports for a team.
 
@@ -251,7 +251,7 @@ Retrieve all reports for a team.
 
 ---
 
-## /analysis/{eventKey} - GET
+## /events/{eventKey}/analysis - GET
 
 Stats about how all teams in an event have performed on average.
 
@@ -279,7 +279,7 @@ The response body can change depending on the schema and data to analyze.
 
 ---
 
-## /analysis/{eventKey}/{team} - GET
+## /events/{eventKey}/teams/{team}/analysis - GET
 
 Stats about how a team has performed at an event on average.
 
@@ -305,7 +305,7 @@ The response body can change depending on the schema and data to analyze.
 
 ---
 
-## /analysis/{eventKey}/{matchKey}/{color} - GET
+## /events/{eventKey}/matches/{matchKey}/alliance/{color}/analysis - GET
 
 Stats about how all teams on an alliance have performed at an event on average.
 
