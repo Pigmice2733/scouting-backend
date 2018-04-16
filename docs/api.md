@@ -47,9 +47,9 @@ Gets all users.
 
 ---
 
-## /users - POST - Authenticated (Admin Users Only)
+## /users - POST
 
-Creates a new user. Usernames can only contain alphanumeric + space characters.
+Creates a new user. Usernames can only contain alphanumeric + space characters. Users created by admins will be created instantly. Accounts created by unauthenticated users are created but require verification by an admin before they can be used.
 
 ### Request Body
 

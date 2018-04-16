@@ -23,9 +23,10 @@ type requestUser struct {
 }
 
 type nullableRequestUser struct {
-	Username *string `json:"username"`
-	Password *string `json:"password"`
-	IsAdmin  *bool   `json:"isAdmin"`
+	Username   *string `json:"username"`
+	Password   *string `json:"password"`
+	IsAdmin    *bool   `json:"isAdmin"`
+	IsVerified *bool   `json:"isVerified"`
 }
 
 func (s *Server) authenticateHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +63,7 @@ func (s *Server) getUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	var resp []map[string]interface{}
 	for _, u := range users {
-		resp = append(resp, map[string]interface{}{"username": u.Username, "isAdmin": u.IsAdmin})
+		resp = append(resp, map[string]interface{}{"username": u.Username, "isAdmin": u.IsAdmin, "isVerified": u.IsVerified})
 	}
 
 	respond.JSON(w, resp)
@@ -95,7 +96,7 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword), IsAdmin: reqUser.IsAdmin}
+	user := user.User{Username: reqUser.Username, HashedPassword: string(hashedPassword), IsAdmin: reqUser.IsAdmin, IsVerified: s.getIsAdmin(r)}
 	if err := s.store.User.Create(user); err != nil {
 		s.logger.LogRequestError(r, fmt.Errorf("creating user: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -120,12 +121,12 @@ func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !authenticatedIsAdmin && (usernameToUpdate != authenticatedUser || (reqUser.IsAdmin != nil && *reqUser.IsAdmin)) {
+	if !authenticatedIsAdmin && (usernameToUpdate != authenticatedUser || (reqUser.IsAdmin != nil && *reqUser.IsAdmin) || (reqUser.IsVerified != nil && *reqUser.IsVerified)) {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
-	updateUser := user.NullableUser{Username: reqUser.Username, IsAdmin: reqUser.IsAdmin}
+	updateUser := user.NullableUser{Username: reqUser.Username, IsAdmin: reqUser.IsAdmin, IsVerified: reqUser.IsVerified}
 
 	if reqUser.Password != nil {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*reqUser.Password), bcrypt.DefaultCost)

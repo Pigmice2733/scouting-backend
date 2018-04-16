@@ -133,11 +133,11 @@ func (s *Server) newHandler(origin string) http.Handler {
 
 		"/users": {
 			Handler: mroute.Multi(map[string]http.Handler{
-				"GET":  http.HandlerFunc(s.getUsersHandler),
+				"GET":  s.authHandler(adminHandler(http.HandlerFunc(s.getUsersHandler))),
 				"POST": http.HandlerFunc(s.createUserHandler),
 			}),
 			Methods:     []string{"GET", "POST"},
-			Middlewares: []mroute.Middleware{s.authHandler, adminHandler},
+			Middlewares: []mroute.Middleware{},
 		},
 
 		"/users/{username}": {

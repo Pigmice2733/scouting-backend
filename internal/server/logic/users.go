@@ -40,6 +40,10 @@ func Authenticate(username, password string, jwtSecret []byte, us user.Service) 
 		return "", err
 	}
 
+	if !user.IsVerified {
+		return "", ErrUnauthorized
+	}
+
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		SubjectClaim:   username,
 		ExpiresAtClaim: time.Now().Add(time.Hour * 24).Unix(),

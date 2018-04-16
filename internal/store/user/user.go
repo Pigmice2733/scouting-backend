@@ -5,6 +5,7 @@ type User struct {
 	Username       string `json:"username"`
 	HashedPassword string `json:"hashedPassword"`
 	IsAdmin        bool   `json:"isAdmin"`
+	IsVerified     bool   `json:"isVerified"`
 }
 
 // NullableUser is a nullable version of user.
@@ -12,6 +13,7 @@ type NullableUser struct {
 	Username       *string `json:"username"`
 	HashedPassword *string `json:"hashedPassword"`
 	IsAdmin        *bool   `json:"isAdmin"`
+	IsVerified     *bool   `json:"isVerified"`
 }
 
 // Service is a store for users.

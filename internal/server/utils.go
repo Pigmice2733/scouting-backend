@@ -21,6 +21,28 @@ const (
 	keyIsAdminCtx
 )
 
+func (s *Server) getIsAdmin(r *http.Request) bool {
+	ss := strings.TrimPrefix(r.Header.Get("Authentication"), "Bearer ")
+	token, err := jwt.Parse(ss, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return s.jwtSecret, nil
+	})
+
+	if err != nil {
+		return false
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		isAdmin, ok := claims[logic.IsAdminClaim].(bool)
+		return ok && isAdmin
+	} else {
+		return false
+	}
+}
+
 func (s *Server) authHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ss := strings.TrimPrefix(r.Header.Get("Authentication"), "Bearer ")
