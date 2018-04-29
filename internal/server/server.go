@@ -176,10 +176,11 @@ func (s *Server) newHandler(origin string) http.Handler {
 		},
 		"/picklists/{id}": {
 			Handler: mroute.Multi(map[string]http.Handler{
-				"GET": http.HandlerFunc(s.picklistHandler),
-				"PUT": s.authHandler(http.HandlerFunc(s.updatePicklistHandler)),
+				"GET":    http.HandlerFunc(s.picklistHandler),
+				"PUT":    s.authHandler(http.HandlerFunc(s.updatePicklistHandler)),
+				"DELETE": s.authHandler(http.HandlerFunc(s.deletePicklistHandler)),
 			}),
-			Methods: []string{"GET", "PUT"},
+			Methods: []string{"GET", "PUT", "DELETE"},
 		},
 		"/picklists/event/{eventKey}": mroute.Simple(http.HandlerFunc(s.picklistEventHandler), "GET", s.authHandler),
 

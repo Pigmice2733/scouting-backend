@@ -19,7 +19,7 @@ func New(db *sql.DB) picklist.Service {
 }
 
 // Get retrieves a picklist from the postgresql database given an id.
-func (s *Service) Get(id int) (p picklist.Picklist, err error) {
+func (s *Service) Get(id string) (p picklist.Picklist, err error) {
 	err = s.db.QueryRow("SELECT id, eventKey, name, owner FROM picklists WHERE id = $1", id).Scan(
 		&p.ID, &p.EventKey, &p.Name, &p.Owner)
 	if err != nil {
@@ -68,7 +68,7 @@ func (s *Service) GetBasicPicklists(username string) (bPicklists []picklist.Basi
 }
 
 // Insert inserts a picklist into the postgresql database.
-func (s *Service) Insert(p picklist.Picklist) (int, error) {
+func (s *Service) Insert(p picklist.Picklist) (string, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return p.ID, err
@@ -103,7 +103,7 @@ func (s *Service) Insert(p picklist.Picklist) (int, error) {
 }
 
 // GetOwner retrieves the owner of a picklist in the postgresql database.
-func (s *Service) GetOwner(id int) (username string, err error) {
+func (s *Service) GetOwner(id string) (username string, err error) {
 	err = s.db.QueryRow("SELECT owner FROM picklists WHERE id = $1", id).Scan(&username)
 	if err == sql.ErrNoRows {
 		err = store.ErrNoResults
@@ -128,8 +128,7 @@ func (s *Service) Update(p picklist.Picklist) error {
 		return err
 	}
 
-	_, err = tx.Exec("DELETE FROM picks WHERE picklistId = $1", p.ID)
-	if err != nil {
+	if _, err = tx.Exec("DELETE FROM picks WHERE picklistId = $1", p.ID); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -145,6 +144,26 @@ func (s *Service) Update(p picklist.Picklist) error {
 		if _, err := stmt.Exec(p.ID, pick); err != nil {
 			return err
 		}
+	}
+
+	return tx.Commit()
+}
+
+// Delete deletes a picklist from the postgresql database.
+func (s *Service) Delete(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec("DELETE FROM picks WHERE picklistId = $1", id); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if _, err := tx.Exec("DELETE FROM picklists WHERE id = $1", id); err != nil {
+		tx.Rollback()
+		return err
 	}
 
 	return tx.Commit()

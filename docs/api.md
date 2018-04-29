@@ -342,17 +342,17 @@ Retrieves all of the authenticated users basic picklist info.
 ```json
 [
   {
-    "id": 17,
+    "id": "de3f0e41-8fde-45d5-b7b4-cb5e06c0584d",
     "eventKey": "2018orwil",
     "name": "climbers",
   },
   {
-    "id": 20,
+    "id": "de3f0e41-8fde-45d5-b7b4-cb5e06c0584e",
     "eventKey": "2018orwil",
     "name": "switch"
   },
   {
-    "id": 6,
+    "id": "de3f0e41-8fde-45d5-b7b4-cb5e06c0584f",
     "eventKey": "2018orore",
     "name": "switch"
   }
@@ -371,12 +371,12 @@ Retrieves all of the authenticated users basic picklist info for a specific even
 ```json
 [
   {
-    "id": 17,
+    "id": "de3f0e41-8fde-45d5-b7b4-cb5e06c0584a",
     "eventKey": "2018orwil",
     "name": "climbers"
   },
   {
-    "id": 20,
+    "id": "de3f0e41-8fde-45d5-b7b4-cb5e06c0584o",
     "eventKey": "2018orwil",
     "name": "switch"
   }
@@ -403,7 +403,7 @@ Creates a new picklist for the authenticated user.
 ### Response Body
 
 ```json
-17
+"de3f0e41-8fde-45d5-b7b4-cb5e06c0584d"
 ```
 
 ---
@@ -416,7 +416,7 @@ Gets a picklist with a given ID.
 
 ```json
 {
-  "id": 6,
+  "id": "de3f0e41-8fde-45d5-b7b4-cb5e06c0584d",
   "eventKey": "2018orore",
   "name": "switch",
   "list": ["frc2733", "frc2471", "frc118"],
@@ -439,6 +439,12 @@ Updates a picklist with a given ID.
   "list": ["frc2733", "frc2471", "frc254"]
 }
 ```
+
+---
+
+## /picklists/{id} - DELETE - Authenticated (and resource belongs to the authenticated user)
+
+Deletes a picklist with a given ID.
 
 ---
 

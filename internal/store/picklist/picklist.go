@@ -2,7 +2,7 @@ package picklist
 
 // BasicPicklist defines a picklist with only it's ID, eventKey, and name.
 type BasicPicklist struct {
-	ID       int    `json:"id"`
+	ID       string `json:"id"`
 	EventKey string `json:"eventKey"`
 	Name     string `json:"name"`
 }
@@ -17,9 +17,10 @@ type Picklist struct {
 // Service is a store for picklists.
 type Service interface {
 	GetBasicPicklists(username string) (bPicklists []BasicPicklist, err error)
-	Get(id int) (p Picklist, err error)
-	Insert(p Picklist) (id int, err error)
+	Get(id string) (p Picklist, err error)
+	Insert(p Picklist) (id string, err error)
 	Update(p Picklist) error
-	GetOwner(id int) (username string, err error)
+	Delete(id string) error
+	GetOwner(id string) (username string, err error)
 	GetByEvent(username, eventKey string) (bPicklists []BasicPicklist, err error)
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/Pigmice2733/scouting-backend/internal/store/picklist"
 
@@ -15,11 +14,7 @@ import (
 )
 
 func (s *Server) picklistHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	id := mux.Vars(r)["id"]
 
 	p, err := s.store.Picklist.Get(id)
 	if err != nil {
@@ -84,11 +79,7 @@ func (s *Server) updatePicklistHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
+	id := mux.Vars(r)["id"]
 
 	var p picklist.Picklist
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
@@ -116,7 +107,39 @@ func (s *Server) updatePicklistHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.store.Picklist.Update(p); err != nil {
-		s.logger.LogRequestError(r, fmt.Errorf("submitting picklist: %v", err))
+		s.logger.LogRequestError(r, fmt.Errorf("updating picklist: %v", err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) deletePicklistHandler(w http.ResponseWriter, r *http.Request) {
+	username, ok := r.Context().Value(keyUsernameCtx).(string)
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	realOwner, err := s.store.Picklist.GetOwner(id)
+	if err != nil {
+		if err == store.ErrNoResults {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		} else {
+			s.logger.LogRequestError(r, fmt.Errorf("getting picklist owner: %v", err))
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if realOwner != username {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	if err := s.store.Picklist.Delete(id); err != nil {
+		s.logger.LogRequestError(r, fmt.Errorf("deleting picklist: %v", err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
