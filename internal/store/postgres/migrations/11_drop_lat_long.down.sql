@@ -1,2 +1,0 @@
-ALTER TABLE events DROP COLUMN lat;
-ALTER TABLE events DROP COLUMN long;

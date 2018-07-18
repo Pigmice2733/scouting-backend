@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS users (
-	username TEXT NOT NULL UNIQUE,
-	hashedPassword TEXT NOT NULL
-)

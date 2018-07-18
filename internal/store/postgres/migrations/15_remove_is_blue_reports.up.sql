@@ -1,1 +1,0 @@
-ALTER TABLE reports DROP COLUMN isBlue

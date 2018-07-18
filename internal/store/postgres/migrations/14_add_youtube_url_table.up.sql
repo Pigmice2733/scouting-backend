@@ -1,1 +1,0 @@
-ALTER TABLE matches ADD COLUMN youtubeURL TEXT
